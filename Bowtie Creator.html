@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisis Diagrama BowTie</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .input-group {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background-color: #f8fafc;
+        }
+        /* Estilos para .connector eliminados ya que el elemento HTML se quitará */
+        .diagram-box {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s ease-in-out;
+        }
+        .diagram-box:hover {
+            transform: translateY(-2px);
+        }
+        .diagram-section-title {
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+        /* Líneas para conectar barreras individuales a su causa/impacto */
+        .barrier-line {
+            height: 2px;
+            width: 10px; /* Corta, solo para indicar conexión */
+        }
+        .preventive-barrier-line { background-color: #7dd3fc; /* sky-300 */ }
+        .mitigative-barrier-line { background-color: #fca5a5; /* rose-300 */ }
+
+        /* Modal styles */
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        .modal-active {
+            display: flex;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-sky-700">Analisis Diagrama BowTie</h1>
+            <p class="text-slate-600 mt-2">Define las causas, barreras, el evento central, impactos y sus barreras para visualizar tu análisis.</p>
+        </header>
+
+        <section id="dataInputs" class="mb-8 p-6 bg-white rounded-xl shadow-lg">
+            <h2 class="text-2xl font-semibold mb-6 text-sky-600 border-b pb-2">1. Definición del Riesgo</h2>
+            <div class="mb-6">
+                <label for="riskEvent" class="block text-lg font-medium text-slate-700 mb-2">Evento Central de Riesgo:</label>
+                <input type="text" id="riskEvent" class="w-full p-3 border border-slate-300 rounded-lg shadow-sm focus:ring-sky-500 focus:border-sky-500" placeholder="Ej: Fuga de gas en la planta">
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <h3 class="text-xl font-semibold mb-4 text-sky-600">2. Causas y Barreras Preventivas</h3>
+                    <div id="causesContainer" class="space-y-4"></div>
+                    <button onclick="addCauseInput()" class="mt-4 bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
+                        + Añadir Causa
+                    </button>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold mb-4 text-rose-600">3. Impactos y Barreras Mitigantes</h3>
+                    <div id="impactsContainer" class="space-y-4"></div>
+                    <button onclick="addImpactInput()" class="mt-4 bg-rose-500 hover:bg-rose-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
+                        + Añadir Impacto
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-3 mt-10 pt-6 border-t">
+                <button onclick="renderBowTie()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-5 rounded-lg text-md shadow-lg transition duration-150 ease-in-out w-full sm:w-auto">
+                    Generar/Actualizar Diagrama
+                </button>
+                <button onclick="exportToXLSX()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-5 rounded-lg text-md shadow-lg transition duration-150 ease-in-out w-full sm:w-auto">
+                    Exportar
+                </button>
+                <label for="importFile" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-5 rounded-lg text-md shadow-lg transition duration-150 ease-in-out cursor-pointer w-full sm:w-auto text-center">
+                    Importar
+                </label>
+                <input type="file" id="importFile" class="hidden" accept=".xlsx, .xls" onchange="handleFileImport(event)">
+                <button onclick="confirmResetAnalysis()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-5 rounded-lg text-md shadow-lg transition duration-150 ease-in-out w-full sm:w-auto">
+                    Reiniciar Análisis
+                </button>
+            </div>
+        </section>
+
+        <section id="diagramVisualization" class="mt-12 p-4 md:p-6 bg-white rounded-xl shadow-lg min-h-[400px]">
+            <h2 class="text-2xl font-semibold mb-6 text-center text-sky-600 border-b pb-2">Diagrama Bow-Tie</h2>
+            <div id="bowtieDiagram" class="flex flex-col md:flex-row justify-between items-stretch w-full p-2 md:p-4 min-h-[300px] gap-2 md:gap-4">
+                <div id="threatsSide" class="w-full md:w-2/5 flex flex-col items-center p-3 md:p-4 bg-sky-600 rounded-xl text-white diagram-box">
+                    <h3 class="text-xl md:text-2xl font-bold mb-4 diagram-section-title">AMENAZAS</h3>
+                    <div id="causesContainerForDiagram" class="space-y-2 w-full flex flex-col items-center"></div>
+                </div>
+                <div id="eventSide" class="w-full md:w-1/5 flex flex-col items-center justify-center p-2 md:p-4 my-4 md:my-0">
+                    <div id="eventBoxDiagram" class="bg-red-600 text-white p-4 md:p-6 rounded-xl text-center font-bold text-lg md:text-xl shadow-xl min-h-[80px] flex items-center justify-center diagram-box">
+                        EVENTO
+                    </div>
+                </div>
+                <div id="consequencesSide" class="w-full md:w-2/5 flex flex-col items-center p-3 md:p-4 bg-rose-600 rounded-xl text-white diagram-box">
+                    <h3 class="text-xl md:text-2xl font-bold mb-4 diagram-section-title">CONSECUENCIAS</h3>
+                    <div id="impactsContainerForDiagram" class="space-y-2 w-full flex flex-col items-center"></div>
+                </div>
+            </div>
+        </section>
+
+        <footer class="text-center mt-12 py-6 border-t border-slate-300"></footer>
+    </div>
+
+    <div id="resetConfirmationModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full justify-center items-center hidden z-50 modal">
+        <div class="bg-white p-6 md:p-8 rounded-lg shadow-xl w-11/12 max-w-md mx-auto">
+            <h3 class="text-xl md:text-2xl font-bold mb-4 text-slate-700">Confirmar Reinicio</h3>
+            <p class="text-slate-600 mb-6">¿Estás seguro de que deseas borrar todos los datos ingresados? Esta acción no se puede deshacer.</p>
+            <div class="flex justify-end space-x-3">
+                <button onclick="closeResetModal()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg">
+                    Cancelar
+                </button>
+                <button onclick="executeResetAnalysis()" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg">
+                    Sí, Reiniciar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let causeCounter = 0;
+        let impactCounter = 0;
+
+        function addCauseInput() {
+            causeCounter++;
+            const causeId = `cause-${causeCounter}`;
+            const container = document.getElementById('causesContainer');
+            const div = document.createElement('div');
+            div.className = 'input-group cause-input-group';
+            div.id = causeId;
+            const removeElementHandler = `removeElement('${causeId}')`;
+            const addPreventiveBarrierHandler = `addPreventiveBarrierInput('${causeId}')`;
+            div.innerHTML = `
+                <div class="flex justify-between items-center mb-2">
+                    <label class="block text-md font-medium text-slate-700">Causa ${causeCounter}:</label>
+                    <button onclick="${removeElementHandler}" class="text-red-500 hover:text-red-700 font-semibold text-sm">Eliminar Causa</button>
+                </div>
+                <input type="text" class="w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-sky-500 focus:border-sky-500 cause-name-input" placeholder="Nombre de la causa">
+                <div class="mt-3">
+                    <h4 class="text-sm font-medium text-slate-600 mb-1">Barreras Preventivas:</h4>
+                    <div class="preventive-barriers-container space-y-2"></div>
+                    <button onclick="${addPreventiveBarrierHandler}" class="mt-2 bg-sky-400 hover:bg-sky-500 text-white font-medium py-1 px-3 rounded-md text-sm transition duration-150 ease-in-out">
+                        + Añadir Barrera Preventiva
+                    </button>
+                </div>
+            `;
+            container.appendChild(div);
+            return div; // Return the created element for import population
+        }
+
+        function addPreventiveBarrierInput(causeId) {
+            const causeElement = document.getElementById(causeId);
+            if (!causeElement) { console.error("Elemento Causa no encontrado:", causeId); return null; }
+            const barriersContainer = causeElement.querySelector('.preventive-barriers-container');
+            if (!barriersContainer) { console.error("Contenedor de Barreras Preventivas no encontrado en:", causeId); return null; }
+            const barrierDiv = document.createElement('div');
+            barrierDiv.className = 'flex items-center space-x-2 barrier-input-item';
+            barrierDiv.innerHTML = `
+                <input type="text" class="w-full p-1 border border-slate-300 rounded-md text-sm preventive-barrier-input" placeholder="Descripción de la barrera">
+                <button onclick="removeElement(this.parentElement)" class="text-red-400 hover:text-red-600 text-xs">Quitar</button>
+            `;
+            barriersContainer.appendChild(barrierDiv);
+            return barrierDiv.querySelector('.preventive-barrier-input'); // Return the input for import
+        }
+
+        function addImpactInput() {
+            impactCounter++;
+            const impactId = `impact-${impactCounter}`;
+            const container = document.getElementById('impactsContainer');
+            const div = document.createElement('div');
+            div.className = 'input-group impact-input-group';
+            div.id = impactId;
+            const removeElementHandler = `removeElement('${impactId}')`;
+            const addMitigativeBarrierHandler = `addMitigativeBarrierInput('${impactId}')`;
+            div.innerHTML = `
+                <div class="flex justify-between items-center mb-2">
+                    <label class="block text-md font-medium text-slate-700">Impacto ${impactCounter}:</label>
+                    <button onclick="${removeElementHandler}" class="text-red-500 hover:text-red-700 font-semibold text-sm">Eliminar Impacto</button>
+                </div>
+                <input type="text" class="w-full p-2 border border-slate-300 rounded-md shadow-sm focus:ring-rose-500 focus:border-rose-500 impact-name-input" placeholder="Nombre del impacto">
+                <div class="mt-3">
+                    <h4 class="text-sm font-medium text-slate-600 mb-1">Barreras Mitigantes:</h4>
+                    <div class="mitigative-barriers-container space-y-2"></div>
+                    <button onclick="${addMitigativeBarrierHandler}" class="mt-2 bg-rose-400 hover:bg-rose-500 text-white font-medium py-1 px-3 rounded-md text-sm transition duration-150 ease-in-out">
+                        + Añadir Barrera Mitigante
+                    </button>
+                </div>
+            `;
+            container.appendChild(div);
+            return div; // Return the created element for import population
+        }
+
+        function addMitigativeBarrierInput(impactId) {
+            const impactElement = document.getElementById(impactId);
+            if (!impactElement) { console.error("Elemento Impacto no encontrado:", impactId); return null; }
+            const barriersContainer = impactElement.querySelector('.mitigative-barriers-container');
+            if (!barriersContainer) { console.error("Contenedor de Barreras Mitigantes no encontrado en:", impactId); return null; }
+            const barrierDiv = document.createElement('div');
+            barrierDiv.className = 'flex items-center space-x-2 barrier-input-item';
+            barrierDiv.innerHTML = `
+                <input type="text" class="w-full p-1 border border-slate-300 rounded-md text-sm mitigative-barrier-input" placeholder="Descripción de la barrera">
+                <button onclick="removeElement(this.parentElement)" class="text-red-400 hover:text-red-600 text-xs">Quitar</button>
+            `;
+            barriersContainer.appendChild(barrierDiv);
+            return barrierDiv.querySelector('.mitigative-barrier-input'); // Return the input for import
+        }
+
+        function removeElement(elementOrId) {
+            const element = typeof elementOrId === 'string' ? document.getElementById(elementOrId) : elementOrId;
+            if (element) { element.remove(); }
+        }
+
+        function renderBowTie() {
+            const riskEventName = document.getElementById('riskEvent').value || "EVENTO CENTRAL";
+            document.getElementById('eventBoxDiagram').textContent = riskEventName;
+            const causesContainerDiagram = document.getElementById('causesContainerForDiagram');
+            const impactsContainerDiagram = document.getElementById('impactsContainerForDiagram');
+            causesContainerDiagram.innerHTML = ''; 
+            impactsContainerDiagram.innerHTML = ''; 
+
+            document.querySelectorAll('.cause-input-group').forEach(group => {
+                const causeName = group.querySelector('.cause-name-input').value || "Causa";
+                const preventiveBarriers = Array.from(group.querySelectorAll('.preventive-barrier-input'))
+                                               .map(input => input.value).filter(value => value.trim() !== "");
+                const causeDiagramItem = document.createElement('div');
+                // Ajuste de clases para mejor alineación sin el conector central
+                causeDiagramItem.className = 'cause-item flex flex-col md:flex-row items-center justify-start w-full p-1 gap-1 md:gap-2'; 
+                
+                let barriersHTML = preventiveBarriers.length > 0 ? preventiveBarriers.map(barrier => 
+                    `<div class="flex items-center justify-end w-full">
+                        <div class="barrier-box bg-slate-200 text-slate-800 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left">${barrier}</div>
+                        <div class="barrier-line preventive-barrier-line ml-1"></div>
+                    </div>`
+                ).join('<div class="h-1"></div>') : '<div class="text-xs text-sky-200 italic text-center w-full">Sin barreras</div>';
+
+                causeDiagramItem.innerHTML = `
+                    <div class="cause-box bg-sky-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-1">${causeName}</div>
+                    <div class="preventive-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-2 items-stretch">
+                        ${barriersHTML}
+                    </div>
+                    `;
+                causesContainerDiagram.appendChild(causeDiagramItem);
+            });
+
+            document.querySelectorAll('.impact-input-group').forEach(group => {
+                const impactName = group.querySelector('.impact-name-input').value || "Impacto";
+                const mitigativeBarriers = Array.from(group.querySelectorAll('.mitigative-barrier-input'))
+                                               .map(input => input.value).filter(value => value.trim() !== "");
+                const impactDiagramItem = document.createElement('div');
+                 // Ajuste de clases para mejor alineación sin el conector central
+                impactDiagramItem.className = 'impact-item flex flex-col md:flex-row items-center justify-end w-full p-1 gap-1 md:gap-2';
+
+                let barriersHTML = mitigativeBarriers.length > 0 ? mitigativeBarriers.map(barrier => 
+                    `<div class="flex items-center justify-start w-full">
+                        <div class="barrier-line mitigative-barrier-line mr-1"></div>
+                        <div class="barrier-box bg-slate-200 text-slate-800 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left">${barrier}</div>
+                    </div>`
+                ).join('<div class="h-1"></div>') : '<div class="text-xs text-rose-200 italic text-center w-full">Sin barreras</div>';
+
+                impactDiagramItem.innerHTML = `
+                    <div class="mitigative-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-1 items-stretch">
+                        ${barriersHTML}
+                    </div>
+                    <div class="impact-box bg-rose-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-2">${impactName}</div>
+                `;
+                impactsContainerDiagram.appendChild(impactDiagramItem);
+            });
+            document.getElementById('diagramVisualization').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // --- Funciones de Reseteo ---
+        function confirmResetAnalysis() {
+            document.getElementById('resetConfirmationModal').classList.remove('hidden');
+            document.getElementById('resetConfirmationModal').classList.add('modal-active');
+        }
+        function closeResetModal() {
+            document.getElementById('resetConfirmationModal').classList.add('hidden');
+            document.getElementById('resetConfirmationModal').classList.remove('modal-active');
+        }
+        function executeResetAnalysis() {
+            document.getElementById('riskEvent').value = '';
+            document.getElementById('causesContainer').innerHTML = '';
+            document.getElementById('impactsContainer').innerHTML = '';
+            document.getElementById('causesContainerForDiagram').innerHTML = '';
+            document.getElementById('impactsContainerForDiagram').innerHTML = '';
+            document.getElementById('eventBoxDiagram').textContent = 'EVENTO';
+            causeCounter = 0;
+            impactCounter = 0;
+            document.getElementById('importFile').value = ''; // Reset file input
+            closeResetModal();
+        }
+
+        // --- Funciones de Exportación/Importación XLSX ---
+        function exportToXLSX() {
+            const riskEvent = document.getElementById('riskEvent').value || "Evento no definido";
+            let data = [[ "EventoRiesgo", riskEvent ]];
+
+            document.querySelectorAll('.cause-input-group').forEach(group => {
+                const causeName = group.querySelector('.cause-name-input').value;
+                const barriers = Array.from(group.querySelectorAll('.preventive-barrier-input')).map(input => input.value);
+                data.push(["Causa", causeName, ...barriers]);
+            });
+
+            data.push([]); // Fila vacía como separador visual (opcional)
+
+            document.querySelectorAll('.impact-input-group').forEach(group => {
+                const impactName = group.querySelector('.impact-name-input').value;
+                const barriers = Array.from(group.querySelectorAll('.mitigative-barrier-input')).map(input => input.value);
+                data.push(["Impacto", impactName, ...barriers]);
+            });
+
+            const worksheet = XLSX.utils.aoa_to_sheet(data);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "BowTie Analisis");
+            XLSX.writeFile(workbook, "AnalisisBowTie.xlsx");
+        }
+
+        function handleFileImport(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1, defval:""});
+                    
+                    executeResetAnalysis(); // Limpiar datos actuales antes de importar
+                    populateDataFromJSON(jsonData);
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        }
+
+        function populateDataFromJSON(jsonData) {
+            if (jsonData.length === 0) return;
+
+            // Procesar Evento de Riesgo
+            const eventRow = jsonData.find(row => row[0] === "EventoRiesgo");
+            if (eventRow && eventRow.length > 1) {
+                document.getElementById('riskEvent').value = eventRow[1];
+            }
+
+            jsonData.forEach(row => {
+                if (row.length < 2) return; // Necesita al menos Tipo y Nombre
+                const elementType = row[0];
+                const elementName = row[1];
+                const barriers = row.slice(2).filter(b => String(b).trim() !== "");
+
+                if (elementType === "Causa") {
+                    const causeDiv = addCauseInput();
+                    if (causeDiv) {
+                        causeDiv.querySelector('.cause-name-input').value = elementName;
+                        const causeId = causeDiv.id;
+                        barriers.forEach(barrierDesc => {
+                            const barrierInput = addPreventiveBarrierInput(causeId);
+                            if (barrierInput) barrierInput.value = barrierDesc;
+                        });
+                    }
+                } else if (elementType === "Impacto") {
+                    const impactDiv = addImpactInput();
+                     if (impactDiv) {
+                        impactDiv.querySelector('.impact-name-input').value = elementName;
+                        const impactId = impactDiv.id;
+                        barriers.forEach(barrierDesc => {
+                            const barrierInput = addMitigativeBarrierInput(impactId);
+                            if(barrierInput) barrierInput.value = barrierDesc;
+                        });
+                    }
+                }
+            });
+            renderBowTie(); // Actualizar el diagrama con los datos importados
+            document.getElementById('importFile').value = ''; // Reset file input to allow re-importing same file
+        }
+
+    </script>
+</body>
+</html>
