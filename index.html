@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analisis Diagrama BowTie</title>
+    <title>Analisis Diagrama BowTie y FTA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -17,7 +17,6 @@
             margin-bottom: 1rem;
             background-color: #f8fafc;
         }
-        /* Estilos para .connector eliminados ya que el elemento HTML se quitará */
         .diagram-box {
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             transition: transform 0.2s ease-in-out;
@@ -28,20 +27,138 @@
         .diagram-section-title {
             text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
         }
-        /* Líneas para conectar barreras individuales a su causa/impacto */
         .barrier-line {
             height: 2px;
-            width: 10px; /* Corta, solo para indicar conexión */
+            width: 10px; 
         }
-        .preventive-barrier-line { background-color: #7dd3fc; /* sky-300 */ }
-        .mitigative-barrier-line { background-color: #fca5a5; /* rose-300 */ }
+        .preventive-barrier-line { background-color: #7dd3fc; }
+        .mitigative-barrier-line { background-color: #fca5a5; }
 
-        /* Modal styles */
         .modal {
             transition: opacity 0.25s ease;
         }
         .modal-active {
             display: flex;
+        }
+        .tab-button-active {
+            border-color: #2563eb; 
+            color: #2563eb;
+            font-weight: 600;
+        }
+        .tab-button-inactive {
+            border-color: transparent;
+            color: #4b5563; 
+        }
+        .tab-button-inactive:hover {
+            border-color: #d1d5db; 
+            color: #1f2937; 
+        }
+        
+        /* Estilos FTA revisados según la imagen de referencia */
+        .fta-diagram-node {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0 5px; 
+            position: relative; 
+        }
+        .fta-event-box, .fta-gate-box {
+            border: 1px solid #4b5563; 
+            padding: 6px 10px;
+            text-align: center;
+            min-width: 130px; 
+            max-width: 220px;
+            background-color: #ffffff; 
+            border-radius: 0.25rem;
+            font-size: 0.75rem; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .fta-event-box .description {
+            font-weight: 500;
+            color: #111827; 
+            margin-bottom: 2px; 
+            min-height: 1.5em; 
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        .fta-event-box .percentage {
+            font-size: 0.7rem;
+            color: #374151; 
+            border-top: 1px solid #d1d5db; 
+            margin-top: 4px;
+            padding-top: 4px;
+        }
+        .fta-top-event-box { 
+            background-color: #fef2f2; /* red-50 (muy claro) */
+            border-color: #dc2626; /* red-600 */
+            font-size: 0.8rem; 
+        }
+        .fta-intermediate-event-box {
+            background-color: #fefce8; /* yellow-50 (muy claro) */
+            border-color: #eab308; /* yellow-500 */
+        }
+        .fta-basic-event-box {
+            background-color: #f0fdf4; /* green-50 (muy claro) */
+            border-color: #16a34a; /* green-600 */
+        }
+        .fta-gate-box {
+            margin-top: 8px;
+            margin-bottom: 8px;
+            font-weight: bold;
+            padding: 5px 10px;
+            font-size: 0.8rem;
+        }
+        .fta-gate-or {
+            background-color: #fdf2f8; /* pink-50 */
+            border-color: #db2777; /* pink-600 */
+            color: #9d174d; /* pink-800 */
+        }
+        .fta-gate-and {
+            background-color: #eef2ff; /* indigo-50 */
+            border-color: #4f46e5; /* indigo-600 */
+            color: #3730a3; /* indigo-800 */
+        }
+        .fta-node-children-container {
+            display: flex;
+            justify-content: center; 
+            gap: 10px; 
+            margin-top: 8px; 
+            position: relative;
+            padding-top: 15px; 
+        }
+        .fta-line-down { 
+            position: absolute;
+            bottom: -8px; 
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1px; 
+            height: 8px; 
+            background-color: #6b7280; 
+        }
+         .fta-line-up { 
+            position: absolute;
+            top: -8px; 
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1px; 
+            height: 8px; 
+            background-color: #6b7280; 
+        }
+        .fta-children-horizontal-bar {
+            position: absolute;
+            top: 0px; 
+            height: 1px; 
+            background-color: #6b7280; 
+        }
+        /* Ocultar flechas de input number en Chrome, Safari, Edge, Opera */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        /* Ocultar flechas de input number en Firefox */
+        input[type=number] {
+          -moz-appearance: textfield;
         }
     </style>
 </head>
@@ -49,82 +166,154 @@
 
     <div class="container mx-auto p-4 md:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-sky-700">Analisis Diagrama BowTie</h1>
-            <p class="text-slate-600 mt-2">Define las causas, barreras, el evento central, impactos y sus barreras para visualizar tu análisis.</p>
+            <h1 class="text-3xl md:text-4xl font-bold text-sky-700">Análisis de Riesgos</h1>
+            <p class="text-slate-600 mt-2">Herramienta para Diagramas BowTie y Árboles de Fallos (FTA)</p>
         </header>
 
-        <section id="dataInputs" class="mb-8 p-6 bg-white rounded-xl shadow-lg">
-            <h2 class="text-2xl font-semibold mb-6 text-sky-600 border-b pb-2">1. Definición del Riesgo</h2>
-            <div class="mb-6">
-                <label for="riskEvent" class="block text-lg font-medium text-slate-700 mb-2">Evento Central de Riesgo:</label>
-                <input type="text" id="riskEvent" class="w-full p-3 border border-slate-300 rounded-lg shadow-sm focus:ring-sky-500 focus:border-sky-500" placeholder="Ej: Fuga de gas en la planta">
-            </div>
+        <!-- Botones de Acción Generales (Movidos aquí) -->
+        <div class="flex flex-col sm:flex-row flex-wrap justify-center items-center space-y-3 sm:space-y-0 sm:space-x-3 mb-8 pb-4 border-b border-slate-200">
+            <button onclick="generateCurrentDiagram()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-5 rounded-lg text-md shadow-lg transition duration-150 ease-in-out w-full sm:w-auto">
+                Generar/Actualizar Diagrama
+            </button>
+            <button onclick="exportCurrentAnalysis()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-5 rounded-lg text-md shadow-lg transition duration-150 ease-in-out w-full sm:w-auto">
+                Exportar
+            </button>
+            <label for="importFile" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-5 rounded-lg text-md shadow-lg transition duration-150 ease-in-out cursor-pointer w-full sm:w-auto text-center">
+                Importar
+            </label>
+            <input type="file" id="importFile" class="hidden" accept=".xlsx, .xls" onchange="handleCurrentFileImport(event)">
+            <button onclick="confirmCurrentReset()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-5 rounded-lg text-md shadow-lg transition duration-150 ease-in-out w-full sm:w-auto">
+                Reiniciar Análisis
+            </button>
+        </div>
 
-            <div class="grid md:grid-cols-2 gap-8">
-                <div>
-                    <h3 class="text-xl font-semibold mb-4 text-sky-600">2. Causas y Barreras Preventivas</h3>
-                    <div id="causesContainer" class="space-y-4"></div>
-                    <button onclick="addCauseInput()" class="mt-4 bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
-                        + Añadir Causa
-                    </button>
-                </div>
-                <div>
-                    <h3 class="text-xl font-semibold mb-4 text-rose-600">3. Impactos y Barreras Mitigantes</h3>
-                    <div id="impactsContainer" class="space-y-4"></div>
-                    <button onclick="addImpactInput()" class="mt-4 bg-rose-500 hover:bg-rose-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
-                        + Añadir Impacto
-                    </button>
-                </div>
-            </div>
+        <!-- Pestañas -->
+        <div class="mb-4 border-b border-gray-200">
+            <ul class="flex flex-wrap -mb-px text-sm font-medium text-center" id="analysisTabs" role="tablist">
+                <li class="mr-2" role="presentation">
+                    <button class="inline-block p-4 border-b-2 rounded-t-lg tab-button-active" id="bowtie-tab-button" type="button" role="tab" aria-controls="bowtieContent" aria-selected="true">Análisis BowTie</button>
+                </li>
+                <li class="mr-2" role="presentation">
+                    <button class="inline-block p-4 border-b-2 rounded-t-lg tab-button-inactive" id="fta-tab-button" type="button" role="tab" aria-controls="ftaContent" aria-selected="false">Análisis Árbol de Fallos (FTA)</button>
+                </li>
+            </ul>
+        </div>
 
-            <div class="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-3 mt-10 pt-6 border-t">
-                <button onclick="renderBowTie()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-5 rounded-lg text-md shadow-lg transition duration-150 ease-in-out w-full sm:w-auto">
-                    Generar/Actualizar Diagrama
-                </button>
-                <button onclick="exportToXLSX()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-5 rounded-lg text-md shadow-lg transition duration-150 ease-in-out w-full sm:w-auto">
-                    Exportar
-                </button>
-                <label for="importFile" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-5 rounded-lg text-md shadow-lg transition duration-150 ease-in-out cursor-pointer w-full sm:w-auto text-center">
-                    Importar
-                </label>
-                <input type="file" id="importFile" class="hidden" accept=".xlsx, .xls" onchange="handleFileImport(event)">
-                <button onclick="confirmResetAnalysis()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-5 rounded-lg text-md shadow-lg transition duration-150 ease-in-out w-full sm:w-auto">
-                    Reiniciar Análisis
-                </button>
-            </div>
-        </section>
-
-        <section id="diagramVisualization" class="mt-12 p-4 md:p-6 bg-white rounded-xl shadow-lg min-h-[400px]">
-            <h2 class="text-2xl font-semibold mb-6 text-center text-sky-600 border-b pb-2">Diagrama Bow-Tie</h2>
-            <div id="bowtieDiagram" class="flex flex-col md:flex-row justify-between items-stretch w-full p-2 md:p-4 min-h-[300px] gap-2 md:gap-4">
-                <div id="threatsSide" class="w-full md:w-2/5 flex flex-col items-center p-3 md:p-4 bg-sky-600 rounded-xl text-white diagram-box">
-                    <h3 class="text-xl md:text-2xl font-bold mb-4 diagram-section-title">AMENAZAS</h3>
-                    <div id="causesContainerForDiagram" class="space-y-2 w-full flex flex-col items-center"></div>
-                </div>
-                <div id="eventSide" class="w-full md:w-1/5 flex flex-col items-center justify-center p-2 md:p-4 my-4 md:my-0">
-                    <div id="eventBoxDiagram" class="bg-red-600 text-white p-4 md:p-6 rounded-xl text-center font-bold text-lg md:text-xl shadow-xl min-h-[80px] flex items-center justify-center diagram-box">
-                        EVENTO
+        <!-- Contenido de las Pestañas -->
+        <div id="tabContentContainer">
+            <!-- Contenido BowTie -->
+            <div id="bowtieContent" role="tabpanel" aria-labelledby="bowtie-tab-button">
+                 <section class="mb-8 p-6 bg-white rounded-xl shadow-lg">
+                    <h2 class="text-2xl font-semibold mb-6 text-sky-600 border-b pb-2">1. Definición del Riesgo (BowTie)</h2>
+                    <div class="mb-6">
+                        <label for="riskEvent" class="block text-lg font-medium text-slate-700 mb-2">Evento Central de Riesgo:</label>
+                        <input type="text" id="riskEvent" class="w-full p-3 border border-slate-300 rounded-lg shadow-sm focus:ring-sky-500 focus:border-sky-500" placeholder="Ej: Fuga de gas en la planta">
                     </div>
-                </div>
-                <div id="consequencesSide" class="w-full md:w-2/5 flex flex-col items-center p-3 md:p-4 bg-rose-600 rounded-xl text-white diagram-box">
-                    <h3 class="text-xl md:text-2xl font-bold mb-4 diagram-section-title">CONSECUENCIAS</h3>
-                    <div id="impactsContainerForDiagram" class="space-y-2 w-full flex flex-col items-center"></div>
-                </div>
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <div>
+                            <h3 class="text-xl font-semibold mb-4 text-sky-600">2. Causas y Barreras Preventivas</h3>
+                            <div id="causesContainer" class="space-y-4"></div>
+                            <button onclick="addCauseInput()" class="mt-4 bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
+                                + Añadir Causa
+                            </button>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold mb-4 text-rose-600">3. Impactos y Barreras Mitigantes</h3>
+                            <div id="impactsContainer" class="space-y-4"></div>
+                            <button onclick="addImpactInput()" class="mt-4 bg-rose-500 hover:bg-rose-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
+                                + Añadir Impacto
+                            </button>
+                        </div>
+                    </div>
+                </section>
+                <section id="bowtieDiagramVisualization" class="mt-12 p-4 md:p-6 bg-white rounded-xl shadow-lg min-h-[400px]">
+                    <h2 class="text-2xl font-semibold mb-6 text-center text-sky-600 border-b pb-2">Diagrama Bow-Tie</h2>
+                    <div id="bowtieDiagram" class="flex flex-col md:flex-row justify-between items-stretch w-full p-2 md:p-4 min-h-[300px] gap-2 md:gap-4">
+                        <div id="threatsSide" class="w-full md:w-2/5 flex flex-col items-center p-3 md:p-4 bg-sky-600 rounded-xl text-white diagram-box">
+                            <h3 class="text-xl md:text-2xl font-bold mb-4 diagram-section-title">AMENAZAS</h3>
+                            <div id="causesContainerForDiagram" class="space-y-2 w-full flex flex-col items-center"></div>
+                        </div>
+                        <div id="eventSide" class="w-full md:w-1/5 flex flex-col items-center justify-center p-2 md:p-4 my-4 md:my-0">
+                            <div id="eventBoxDiagram" class="bg-red-600 text-white p-4 md:p-6 rounded-xl text-center font-bold text-lg md:text-xl shadow-xl min-h-[80px] flex items-center justify-center diagram-box">
+                                EVENTO
+                            </div>
+                        </div>
+                        <div id="consequencesSide" class="w-full md:w-2/5 flex flex-col items-center p-3 md:p-4 bg-rose-600 rounded-xl text-white diagram-box">
+                            <h3 class="text-xl md:text-2xl font-bold mb-4 diagram-section-title">CONSECUENCIAS</h3>
+                            <div id="impactsContainerForDiagram" class="space-y-2 w-full flex flex-col items-center"></div>
+                        </div>
+                    </div>
+                </section>
             </div>
-        </section>
+
+            <!-- Contenido FTA -->
+            <div id="ftaContent" role="tabpanel" aria-labelledby="fta-tab-button" class="hidden">
+                <section class="mb-8 p-6 bg-white rounded-xl shadow-lg">
+                    <h2 class="text-2xl font-semibold mb-6 text-indigo-600 border-b pb-2">1. Definición del Árbol de Fallos (FTA)</h2>
+                    <div class="mb-6 p-4 border border-indigo-200 rounded-lg bg-indigo-50">
+                        <h4 class="text-lg font-semibold text-indigo-700 mb-2">Evento Principal (Top Event)</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                            <div>
+                                <label for="ftaTopEventDesc" class="block text-sm font-medium text-slate-700">Descripción:</label>
+                                <input type="text" id="ftaTopEventDesc" class="w-full mt-1 p-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Descripción del evento principal">
+                            </div>
+                            <div>
+                                <label for="ftaTopEventProb" class="block text-sm font-medium text-slate-700">Probabilidad (%):</label>
+                                <input type="number" id="ftaTopEventProb" class="w-full mt-1 p-2 border border-slate-300 rounded-md shadow-sm bg-slate-200" placeholder="Calculada" readonly>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="ftaTopEventGate" class="block text-sm font-medium text-slate-700">Compuerta (debajo del Top Event):</label>
+                                <select id="ftaTopEventGate" class="w-full mt-1 p-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option value="OR">OR</option>
+                                    <option value="AND">AND</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="ftaTopEventInputs" class="block text-sm font-medium text-slate-700">IDs de Entradas a esta Compuerta (Ej: N1, N2):</label>
+                                <input type="text" id="ftaTopEventInputs" class="w-full mt-1 p-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="N1, N2, ...">
+                            </div>
+                        </div>
+                         <div class="mt-3 text-right">
+                            <button onclick="addFtaChildElement('ftaTopEventInputs')" class="text-xs bg-indigo-200 hover:bg-indigo-300 text-indigo-700 font-semibold py-1 px-2 rounded-md">
+                                + Añadir Entrada a Compuerta del Top Event
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-xl font-semibold mb-4 text-indigo-600">2. Elementos del Árbol (Intermedios y Base)</h3>
+                        <div id="ftaElementsContainer" class="space-y-4">
+                            <!-- Elementos del FTA se añadirán aquí -->
+                        </div>
+                        <button onclick="addFtaElementInput()" class="mt-4 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
+                            + Añadir Elemento al Árbol (General)
+                        </button>
+                    </div>
+                </section>
+                <section id="ftaDiagramVisualization" class="mt-12 p-4 md:p-6 bg-white rounded-xl shadow-lg min-h-[300px]">
+                    <h2 class="text-2xl font-semibold mb-6 text-center text-indigo-600 border-b pb-2">Diagrama del Árbol de Fallos (FTA)</h2>
+                    <div id="ftaDiagramContainer" class="text-sm text-slate-700 p-4 border rounded-lg bg-slate-50 min-h-[200px] overflow-x-auto flex flex-col items-center">
+                        <p class="text-slate-400">El diagrama del FTA aparecerá aquí después de generar.</p>
+                    </div>
+                </section>
+            </div>
+        </div>
+
 
         <footer class="text-center mt-12 py-6 border-t border-slate-300"></footer>
     </div>
 
     <div id="resetConfirmationModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full justify-center items-center hidden z-50 modal">
         <div class="bg-white p-6 md:p-8 rounded-lg shadow-xl w-11/12 max-w-md mx-auto">
-            <h3 class="text-xl md:text-2xl font-bold mb-4 text-slate-700">Confirmar Reinicio</h3>
-            <p class="text-slate-600 mb-6">¿Estás seguro de que deseas borrar todos los datos ingresados? Esta acción no se puede deshacer.</p>
+            <h3 id="resetModalTitle" class="text-xl md:text-2xl font-bold mb-4 text-slate-700">Confirmar Reinicio</h3>
+            <p id="resetModalMessage" class="text-slate-600 mb-6">¿Estás seguro de que deseas borrar todos los datos ingresados? Esta acción no se puede deshacer.</p>
             <div class="flex justify-end space-x-3">
                 <button onclick="closeResetModal()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg">
                     Cancelar
                 </button>
-                <button onclick="executeResetAnalysis()" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg">
+                <button id="confirmResetButton" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg">
                     Sí, Reiniciar
                 </button>
             </div>
@@ -132,8 +321,55 @@
     </div>
 
     <script>
+        // --- Gestión de Pestañas ---
+        const tabButtons = {
+            bowtie: document.getElementById('bowtie-tab-button'),
+            fta: document.getElementById('fta-tab-button')
+        };
+        const tabContents = {
+            bowtie: document.getElementById('bowtieContent'),
+            fta: document.getElementById('ftaContent')
+        };
+        let activeTab = 'bowtie'; 
+
+        function showTab(tabId) {
+            activeTab = tabId;
+            for (const id in tabContents) {
+                if (id === tabId) {
+                    tabContents[id].classList.remove('hidden');
+                    tabButtons[id].classList.add('tab-button-active');
+                    tabButtons[id].classList.remove('tab-button-inactive');
+                    tabButtons[id].setAttribute('aria-selected', 'true');
+                } else {
+                    tabContents[id].classList.add('hidden');
+                    tabButtons[id].classList.remove('tab-button-active');
+                    tabButtons[id].classList.add('tab-button-inactive');
+                    tabButtons[id].setAttribute('aria-selected', 'false');
+                }
+            }
+        }
+        tabButtons.bowtie.addEventListener('click', () => showTab('bowtie'));
+        tabButtons.fta.addEventListener('click', () => showTab('fta'));
+        showTab('bowtie'); 
+
         let causeCounter = 0;
         let impactCounter = 0;
+        let ftaNodeCounter = 0;
+
+        function validatePercentageInput(inputElement) {
+            let value = parseInt(inputElement.value);
+            if (isNaN(value) && inputElement.value !== "") { 
+                inputElement.value = '';
+            } else if (value < 0 && inputElement.value !== "") { 
+                 inputElement.value = 0;
+            } else if (value > 100) {
+                inputElement.value = 100;
+            }
+            if (inputElement.value !== "" && !isNaN(value)) {
+                 inputElement.value = value; 
+            }
+        }
+
 
         function addCauseInput() {
             causeCounter++;
@@ -159,7 +395,7 @@
                 </div>
             `;
             container.appendChild(div);
-            return div; // Return the created element for import population
+            return div;
         }
 
         function addPreventiveBarrierInput(causeId) {
@@ -174,7 +410,7 @@
                 <button onclick="removeElement(this.parentElement)" class="text-red-400 hover:text-red-600 text-xs">Quitar</button>
             `;
             barriersContainer.appendChild(barrierDiv);
-            return barrierDiv.querySelector('.preventive-barrier-input'); // Return the input for import
+            return barrierDiv.querySelector('.preventive-barrier-input');
         }
 
         function addImpactInput() {
@@ -201,7 +437,7 @@
                 </div>
             `;
             container.appendChild(div);
-            return div; // Return the created element for import population
+            return div;
         }
 
         function addMitigativeBarrierInput(impactId) {
@@ -216,7 +452,7 @@
                 <button onclick="removeElement(this.parentElement)" class="text-red-400 hover:text-red-600 text-xs">Quitar</button>
             `;
             barriersContainer.appendChild(barrierDiv);
-            return barrierDiv.querySelector('.mitigative-barrier-input'); // Return the input for import
+            return barrierDiv.querySelector('.mitigative-barrier-input');
         }
 
         function removeElement(elementOrId) {
@@ -224,7 +460,7 @@
             if (element) { element.remove(); }
         }
 
-        function renderBowTie() {
+        function renderBowTieDiagram() {
             const riskEventName = document.getElementById('riskEvent').value || "EVENTO CENTRAL";
             document.getElementById('eventBoxDiagram').textContent = riskEventName;
             const causesContainerDiagram = document.getElementById('causesContainerForDiagram');
@@ -237,22 +473,18 @@
                 const preventiveBarriers = Array.from(group.querySelectorAll('.preventive-barrier-input'))
                                                .map(input => input.value).filter(value => value.trim() !== "");
                 const causeDiagramItem = document.createElement('div');
-                // Ajuste de clases para mejor alineación sin el conector central
                 causeDiagramItem.className = 'cause-item flex flex-col md:flex-row items-center justify-start w-full p-1 gap-1 md:gap-2'; 
-                
                 let barriersHTML = preventiveBarriers.length > 0 ? preventiveBarriers.map(barrier => 
                     `<div class="flex items-center justify-end w-full">
                         <div class="barrier-box bg-slate-200 text-slate-800 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left">${barrier}</div>
                         <div class="barrier-line preventive-barrier-line ml-1"></div>
                     </div>`
                 ).join('<div class="h-1"></div>') : '<div class="text-xs text-sky-200 italic text-center w-full">Sin barreras</div>';
-
                 causeDiagramItem.innerHTML = `
                     <div class="cause-box bg-sky-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-1">${causeName}</div>
                     <div class="preventive-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-2 items-stretch">
                         ${barriersHTML}
-                    </div>
-                    `;
+                    </div>`;
                 causesContainerDiagram.appendChild(causeDiagramItem);
             });
 
@@ -261,37 +493,348 @@
                 const mitigativeBarriers = Array.from(group.querySelectorAll('.mitigative-barrier-input'))
                                                .map(input => input.value).filter(value => value.trim() !== "");
                 const impactDiagramItem = document.createElement('div');
-                 // Ajuste de clases para mejor alineación sin el conector central
                 impactDiagramItem.className = 'impact-item flex flex-col md:flex-row items-center justify-end w-full p-1 gap-1 md:gap-2';
-
                 let barriersHTML = mitigativeBarriers.length > 0 ? mitigativeBarriers.map(barrier => 
                     `<div class="flex items-center justify-start w-full">
                         <div class="barrier-line mitigative-barrier-line mr-1"></div>
                         <div class="barrier-box bg-slate-200 text-slate-800 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left">${barrier}</div>
                     </div>`
                 ).join('<div class="h-1"></div>') : '<div class="text-xs text-rose-200 italic text-center w-full">Sin barreras</div>';
-
                 impactDiagramItem.innerHTML = `
                     <div class="mitigative-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-1 items-stretch">
                         ${barriersHTML}
                     </div>
-                    <div class="impact-box bg-rose-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-2">${impactName}</div>
-                `;
+                    <div class="impact-box bg-rose-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-2">${impactName}</div>`;
                 impactsContainerDiagram.appendChild(impactDiagramItem);
             });
-            document.getElementById('diagramVisualization').scrollIntoView({ behavior: 'smooth' });
+            if (document.getElementById('bowtieDiagramVisualization')) {
+                 document.getElementById('bowtieDiagramVisualization').scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+        
+        // --- FTA Functions ---
+        function addFtaChildElement(parentInputsFieldId) {
+            const newElementFullId = addFtaElementInput(); 
+            if (newElementFullId) {
+                const newElementShortId = `N${newElementFullId.split('-')[2]}`;
+                const parentInputsField = document.getElementById(parentInputsFieldId);
+                if (parentInputsField) {
+                    parentInputsField.value = parentInputsField.value ? `${parentInputsField.value.trim()}, ${newElementShortId}`.replace(/^,|, $/, '') : newElementShortId;
+                    const newElementDiv = document.getElementById(newElementFullId);
+                    if (newElementDiv) {
+                        newElementDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        const firstInput = newElementDiv.querySelector('input, select');
+                        if (firstInput) firstInput.focus();
+                    }
+                }
+            }
         }
 
-        // --- Funciones de Reseteo ---
-        function confirmResetAnalysis() {
+
+        function addFtaElementInput() { 
+            ftaNodeCounter++;
+            const shortId = `N${ftaNodeCounter}`; 
+            const fullId = `fta-node-${ftaNodeCounter}`; 
+            const container = document.getElementById('ftaElementsContainer');
+            const div = document.createElement('div');
+            div.className = 'input-group fta-element-input-group border-l-4 border-indigo-300';
+            div.id = fullId; 
+            
+            let addButtonHTML = '';
+            const addChildButtonId = `${fullId}-add-child-btn`;
+            addButtonHTML = `
+                <div id="${fullId}-add-child-section" class="mt-2 text-right hidden">
+                     <button id="${addChildButtonId}" onclick="addFtaChildElement('${fullId}-inputs')" class="text-xs bg-indigo-200 hover:bg-indigo-300 text-indigo-700 font-semibold py-1 px-2 rounded-md">
+                        + Añadir Entrada a esta Compuerta
+                    </button>
+                </div>`;
+
+            div.innerHTML = `
+                <div class="flex justify-between items-center mb-2">
+                    <label class="block text-md font-medium text-slate-700">Elemento ID: <span class="font-mono bg-indigo-100 text-indigo-700 px-1 rounded">${shortId}</span></label>
+                    <button onclick="removeElement('${fullId}')" class="text-red-500 hover:text-red-700 font-semibold text-sm">Eliminar Elemento</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="${fullId}-desc" class="block text-sm font-medium text-slate-700">Descripción:</label>
+                        <input type="text" id="${fullId}-desc" class="w-full mt-1 p-2 border border-slate-300 rounded-md shadow-sm fta-element-desc" placeholder="Descripción del evento">
+                    </div>
+                    <div>
+                        <label for="${fullId}-type" class="block text-sm font-medium text-slate-700">Tipo de Evento:</label>
+                        <select id="${fullId}-type" class="w-full mt-1 p-2 border border-slate-300 rounded-md shadow-sm fta-element-type" onchange="toggleFtaGateInput('${fullId}')">
+                            <option value="BASIC">Evento Base</option>
+                            <option value="INTERMEDIATE">Evento Intermedio</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="${fullId}-prob-section" class="mt-3"> 
+                     <label for="${fullId}-prob" class="block text-sm font-medium text-slate-700">Probabilidad (%):</label>
+                     <input type="number" id="${fullId}-prob" min="0" max="100" oninput="validatePercentageInput(this)" class="w-full md:w-1/2 mt-1 p-2 border border-slate-300 rounded-md shadow-sm fta-element-prob" placeholder="0-100 (solo para Base)">
+                </div>
+                <div id="${fullId}-gate-section" class="hidden mt-3">
+                    <label for="${fullId}-gate" class="block text-sm font-medium text-slate-700">Compuerta (debajo de este Intermedio):</label>
+                    <select id="${fullId}-gate" class="w-full md:w-1/2 mt-1 p-2 border border-slate-300 rounded-md shadow-sm fta-element-gate">
+                        <option value="OR">OR</option>
+                        <option value="AND">AND</option>
+                    </select>
+                </div>
+                <div id="${fullId}-inputs-section" class="hidden mt-3">
+                    <label for="${fullId}-inputs" class="block text-sm font-medium text-slate-700">IDs de Entradas (Ej: N1, N2):</label>
+                    <input type="text" id="${fullId}-inputs" class="w-full mt-1 p-2 border border-slate-300 rounded-md shadow-sm fta-element-inputs" placeholder="N1, N2, ...">
+                    ${addButtonHTML}
+                </div>
+            `;
+            container.appendChild(div);
+            toggleFtaGateInput(fullId); 
+            return fullId; 
+        }
+
+        function toggleFtaGateInput(fullId) { 
+            const typeSelect = document.getElementById(`${fullId}-type`);
+            const gateSection = document.getElementById(`${fullId}-gate-section`);
+            const inputsSection = document.getElementById(`${fullId}-inputs-section`);
+            const probInput = document.getElementById(`${fullId}-prob`);
+            const addChildButtonSection = document.getElementById(`${fullId}-add-child-section`);
+
+
+            if (typeSelect.value === 'INTERMEDIATE') {
+                gateSection.classList.remove('hidden');
+                inputsSection.classList.remove('hidden');
+                if(addChildButtonSection) addChildButtonSection.classList.remove('hidden');
+                probInput.readOnly = true;
+                probInput.classList.add('bg-slate-200');
+                probInput.placeholder = "Calculada";
+                probInput.value = ''; 
+            } else { // BASIC
+                gateSection.classList.add('hidden');
+                inputsSection.classList.add('hidden');
+                if(addChildButtonSection) addChildButtonSection.classList.add('hidden');
+                probInput.readOnly = false;
+                probInput.classList.remove('bg-slate-200');
+                probInput.placeholder = "0-100";
+            }
+        }
+        
+        function renderFtaDiagram() {
+            const topEventDescInput = document.getElementById('ftaTopEventDesc').value.trim();
+            const topEventGateInput = document.getElementById('ftaTopEventGate').value;
+            const topEventInputsStr = document.getElementById('ftaTopEventInputs').value.trim();
+
+            const diagramContainer = document.getElementById('ftaDiagramContainer');
+            diagramContainer.innerHTML = ''; 
+
+            const elementsData = [];
+            document.querySelectorAll('.fta-element-input-group').forEach(group => {
+                const fullId = group.id; 
+                const shortId = `N${fullId.split('-')[2]}`; 
+                const description = group.querySelector('.fta-element-desc').value || `Elemento ${shortId}`;
+                const probabilityStr = group.querySelector('.fta-element-prob').value;
+                const type = group.querySelector('.fta-element-type').value;
+                
+                let probabilityForCalc = 0; 
+                if (type === 'BASIC' && probabilityStr !== "") {
+                    probabilityForCalc = parseFloat(probabilityStr) / 100.0; 
+                    if (isNaN(probabilityForCalc) || probabilityForCalc < 0 || probabilityForCalc > 1) probabilityForCalc = 0;
+                }
+
+                let gate = null;
+                let inputs = []; 
+                if (type === 'INTERMEDIATE') {
+                    gate = group.querySelector('.fta-element-gate').value;
+                    inputs = group.querySelector('.fta-element-inputs').value.split(',')
+                                 .map(s => s.trim().toUpperCase()) 
+                                 .filter(s => s);
+                }
+                elementsData.push({ 
+                    id: shortId, 
+                    description, 
+                    probabilityInput: probabilityStr, 
+                    type, gate, inputs, 
+                    calculatedProb: (type === 'BASIC' ? probabilityForCalc : undefined) 
+                });
+            });
+
+            if (!topEventDescInput) {
+                diagramContainer.innerHTML = '<p class="text-slate-400">Por favor, defina el Evento Principal (Top Event).</p>';
+                return;
+            }
+            
+            const nodesMap = new Map();
+            const topEventNodeData = {
+                id: 'TOP_EVENT_ID', 
+                description: topEventDescInput,
+                probabilityInput: "", 
+                type: 'INTERMEDIATE', 
+                gate: topEventGateInput,
+                inputs: topEventInputsStr.split(',').map(s => s.trim().toUpperCase()).filter(s => s),
+                children: [],
+                isTopEventNode: true, 
+                rendered: false,
+                calculatedProb: undefined
+            };
+            nodesMap.set(topEventNodeData.id, topEventNodeData);
+
+            elementsData.forEach(el => {
+                nodesMap.set(el.id, { ...el, children: [], isTopEventNode: false, rendered: false });
+            });
+            
+            nodesMap.forEach(parentNode => {
+                if (parentNode.inputs && parentNode.inputs.length > 0) {
+                     parentNode.inputs.forEach(inputId => { 
+                        let childNode = nodesMap.get(inputId);
+                        if (!childNode) { 
+                            childNode = {id: inputId, description: `ID: ${inputId} (No definido)`, probabilityInput: '', type: 'BASIC', children: [], rendered: false, calculatedProb: 0};
+                            nodesMap.set(inputId, childNode); 
+                        }
+                        parentNode.children.push(childNode);
+                    });
+                }
+            });
+
+            function calculateNodeProbability(nodeId) {
+                const node = nodesMap.get(nodeId);
+                if (!node) return 0; 
+                if (node.calculatedProb !== undefined && node.type !== 'BASIC') return node.calculatedProb; 
+                if (node.type === 'BASIC') { 
+                    let prob = 0;
+                    if (node.probabilityInput && node.probabilityInput !== "") {
+                         prob = parseFloat(node.probabilityInput) / 100.0;
+                         if (isNaN(prob) || prob < 0 || prob > 1) prob = 0;
+                    }
+                    node.calculatedProb = prob;
+                    return node.calculatedProb;
+                }
+
+
+                if (node.type === 'INTERMEDIATE') {
+                    if (!node.inputs || node.inputs.length === 0) {
+                        node.calculatedProb = 0; 
+                        return 0;
+                    }
+                    const childProbs = node.inputs.map(inputId => calculateNodeProbability(inputId));
+
+                    if (node.gate === 'AND') {
+                        node.calculatedProb = childProbs.reduce((acc, p) => acc * p, 1);
+                    } else if (node.gate === 'OR') {
+                        node.calculatedProb = 1 - childProbs.reduce((acc, p) => acc * (1 - p), 1);
+                    } else {
+                        node.calculatedProb = 0; 
+                    }
+                    return node.calculatedProb;
+                }
+                return 0;
+            }
+            
+            calculateNodeProbability(topEventNodeData.id);
+            const topProbValue = nodesMap.get(topEventNodeData.id).calculatedProb;
+            document.getElementById('ftaTopEventProb').value = topProbValue !== undefined ? (topProbValue * 100).toFixed(2) : '';
+
+
+            function createFtaDiagramNodeRecursive(nodeData) {
+                if (!nodeData || nodeData.rendered) return document.createDocumentFragment();
+                nodeData.rendered = true;
+
+                const nodeWrapper = document.createElement('div');
+                nodeWrapper.className = 'fta-diagram-node';
+
+                const eventBox = document.createElement('div');
+                eventBox.classList.add('fta-event-box');
+                if (nodeData.isTopEventNode) { 
+                    eventBox.classList.add('fta-top-event-box');
+                } else if (nodeData.type === 'INTERMEDIATE') {
+                    eventBox.classList.add('fta-intermediate-event-box');
+                } else { 
+                    eventBox.classList.add('fta-basic-event-box');
+                }
+                
+                let probDisplayValue = '';
+                if (nodeData.calculatedProb !== undefined) { 
+                    probDisplayValue = (nodeData.calculatedProb * 100).toFixed(2) + '%';
+                } else if (nodeData.type === 'BASIC' && nodeData.probabilityInput) { 
+                    probDisplayValue = nodeData.probabilityInput + '%';
+                }
+
+
+                eventBox.innerHTML = `<div class="description">${nodeData.description}</div><div class="percentage">${probDisplayValue}</div>`;
+                nodeWrapper.appendChild(eventBox);
+
+                if (nodeData.type === 'INTERMEDIATE' && nodeData.inputs.length > 0) {
+                    eventBox.innerHTML += `<div class="fta-line-down"></div>`;
+                    
+                    const gateBox = document.createElement('div');
+                    gateBox.classList.add('fta-gate-box', nodeData.gate === 'AND' ? 'fta-gate-and' : 'fta-gate-or');
+                    gateBox.textContent = nodeData.gate;
+                    nodeWrapper.appendChild(gateBox);
+                    gateBox.innerHTML += `<div class="fta-line-down"></div>`;
+
+                    const childrenContainer = document.createElement('div');
+                    childrenContainer.className = 'fta-node-children-container';
+                    if (nodeData.inputs.length > 1) {
+                        const bar = document.createElement('div');
+                        bar.className = 'fta-children-horizontal-bar';
+                        const childBoxWidth = 130; 
+                        const gap = 10;
+                        const barWidth = ((nodeData.inputs.length - 1) * (childBoxWidth + gap));
+                        bar.style.width = `${Math.max(20, barWidth)}px`; 
+                        bar.style.left = `calc(50% - ${barWidth / 2}px)`;
+                        childrenContainer.appendChild(bar);
+                    }
+
+                    nodeData.inputs.forEach(inputId => {
+                        const childNodeData = nodesMap.get(inputId);
+                        const childElement = createFtaDiagramNodeRecursive(childNodeData); 
+                        const childEventBox = childElement.querySelector('.fta-event-box');
+                        if(childEventBox) childEventBox.innerHTML += `<div class="fta-line-up"></div>`;
+                        childrenContainer.appendChild(childElement);
+                    });
+                    nodeWrapper.appendChild(childrenContainer);
+                }
+                return nodeWrapper;
+            }
+            
+            nodesMap.forEach(n => n.rendered = false); 
+            diagramContainer.appendChild(createFtaDiagramNodeRecursive(topEventNodeData));
+            
+            if (diagramContainer.children.length === 0) {
+                 diagramContainer.innerHTML = '<p class="text-slate-400">No se pudo generar el diagrama. Verifique la definición del Top Event y los elementos.</p>';
+            }
+
+             if (document.getElementById('ftaDiagramVisualization')) {
+                document.getElementById('ftaDiagramVisualization').scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+
+        let resetCallback = null;
+        function confirmCurrentReset() {
+            const modalTitle = document.getElementById('resetModalTitle');
+            const modalMessage = document.getElementById('resetModalMessage');
+            const confirmBtn = document.getElementById('confirmResetButton');
+
+            if (activeTab === 'bowtie') {
+                modalTitle.textContent = 'Confirmar Reinicio BowTie';
+                modalMessage.textContent = '¿Estás seguro de que deseas borrar todos los datos del análisis BowTie? Esta acción no se puede deshacer.';
+                resetCallback = executeResetBowTieAnalysis;
+            } else if (activeTab === 'fta') {
+                modalTitle.textContent = 'Confirmar Reinicio FTA';
+                modalMessage.textContent = '¿Estás seguro de que deseas borrar todos los datos del Árbol de Fallos? Esta acción no se puede deshacer.';
+                resetCallback = executeResetFtaAnalysis;
+            }
+            confirmBtn.onclick = () => {
+                if (resetCallback) resetCallback();
+                closeResetModal();
+            };
             document.getElementById('resetConfirmationModal').classList.remove('hidden');
             document.getElementById('resetConfirmationModal').classList.add('modal-active');
         }
+
         function closeResetModal() {
             document.getElementById('resetConfirmationModal').classList.add('hidden');
             document.getElementById('resetConfirmationModal').classList.remove('modal-active');
+            resetCallback = null;
         }
-        function executeResetAnalysis() {
+
+        function executeResetBowTieAnalysis() {
             document.getElementById('riskEvent').value = '';
             document.getElementById('causesContainer').innerHTML = '';
             document.getElementById('impactsContainer').innerHTML = '';
@@ -300,68 +843,79 @@
             document.getElementById('eventBoxDiagram').textContent = 'EVENTO';
             causeCounter = 0;
             impactCounter = 0;
-            document.getElementById('importFile').value = ''; // Reset file input
-            closeResetModal();
         }
 
-        // --- Funciones de Exportación/Importación XLSX ---
-        function exportToXLSX() {
+        function executeResetFtaAnalysis() {
+            document.getElementById('ftaTopEventDesc').value = '';
+            document.getElementById('ftaTopEventProb').value = ''; 
+            document.getElementById('ftaTopEventGate').value = 'OR';
+            document.getElementById('ftaTopEventInputs').value = '';
+            document.getElementById('ftaElementsContainer').innerHTML = '';
+            document.getElementById('ftaDiagramContainer').innerHTML = '<p class="text-slate-400">El diagrama del FTA aparecerá aquí después de generar.</p>';
+            ftaNodeCounter = 0;
+        }
+        
+        function exportCurrentAnalysis() {
+            if (activeTab === 'bowtie') {
+                exportBowTieToXLSX();
+            } else if (activeTab === 'fta') {
+                exportFtaToXLSX();
+            }
+        }
+        function handleCurrentFileImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1, defval:""});
+                
+                if (activeTab === 'bowtie') {
+                    executeResetBowTieAnalysis(); 
+                    populateBowTieFromJSON(jsonData);
+                } else if (activeTab === 'fta') {
+                    executeResetFtaAnalysis();
+                    populateFtaFromJSON(jsonData);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+            event.target.value = ''; 
+        }
+
+        function exportBowTieToXLSX() {
             const riskEvent = document.getElementById('riskEvent').value || "Evento no definido";
             let data = [[ "EventoRiesgo", riskEvent ]];
-
             document.querySelectorAll('.cause-input-group').forEach(group => {
                 const causeName = group.querySelector('.cause-name-input').value;
                 const barriers = Array.from(group.querySelectorAll('.preventive-barrier-input')).map(input => input.value);
-                data.push(["Causa", causeName, ...barriers]);
+                data.push(["Causa", causeName || "Causa sin nombre", ...barriers]);
             });
-
-            data.push([]); // Fila vacía como separador visual (opcional)
-
+            data.push([]); 
             document.querySelectorAll('.impact-input-group').forEach(group => {
                 const impactName = group.querySelector('.impact-name-input').value;
                 const barriers = Array.from(group.querySelectorAll('.mitigative-barrier-input')).map(input => input.value);
-                data.push(["Impacto", impactName, ...barriers]);
+                data.push(["Impacto", impactName || "Impacto sin nombre", ...barriers]);
             });
-
             const worksheet = XLSX.utils.aoa_to_sheet(data);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "BowTie Analisis");
             XLSX.writeFile(workbook, "AnalisisBowTie.xlsx");
         }
 
-        function handleFileImport(event) {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, {type: 'array'});
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1, defval:""});
-                    
-                    executeResetAnalysis(); // Limpiar datos actuales antes de importar
-                    populateDataFromJSON(jsonData);
-                };
-                reader.readAsArrayBuffer(file);
-            }
-        }
-
-        function populateDataFromJSON(jsonData) {
+        function populateBowTieFromJSON(jsonData) {
             if (jsonData.length === 0) return;
-
-            // Procesar Evento de Riesgo
             const eventRow = jsonData.find(row => row[0] === "EventoRiesgo");
             if (eventRow && eventRow.length > 1) {
                 document.getElementById('riskEvent').value = eventRow[1];
             }
-
             jsonData.forEach(row => {
-                if (row.length < 2) return; // Necesita al menos Tipo y Nombre
+                if (row.length < 2) return;
                 const elementType = row[0];
                 const elementName = row[1];
                 const barriers = row.slice(2).filter(b => String(b).trim() !== "");
-
                 if (elementType === "Causa") {
                     const causeDiv = addCauseInput();
                     if (causeDiv) {
@@ -384,10 +938,89 @@
                     }
                 }
             });
-            renderBowTie(); // Actualizar el diagrama con los datos importados
-            document.getElementById('importFile').value = ''; // Reset file input to allow re-importing same file
+            renderBowTieDiagram();
         }
 
+        function exportFtaToXLSX() {
+            const topEventDesc = document.getElementById('ftaTopEventDesc').value || "Top Event no definido";
+            const topEventGate = document.getElementById('ftaTopEventGate').value || "OR";
+            const topEventInputs = document.getElementById('ftaTopEventInputs').value || "";
+
+            let data = [["FTATopEventDesc", topEventDesc], 
+                        ["FTATopEventGate", topEventGate],
+                        ["FTATopEventInputs", topEventInputs]];
+            
+            document.querySelectorAll('.fta-element-input-group').forEach(group => {
+                const fullId = group.id;
+                const shortId = `N${fullId.split('-')[2]}`;
+                const description = group.querySelector('.fta-element-desc').value;
+                const type = group.querySelector('.fta-element-type').value;
+                let probability = ''; 
+                let gate = '';
+                let inputs = '';
+                if (type === 'BASIC') {
+                    probability = group.querySelector('.fta-element-prob').value;
+                } else if (type === 'INTERMEDIATE') {
+                    gate = group.querySelector('.fta-element-gate').value;
+                    inputs = group.querySelector('.fta-element-inputs').value;
+                }
+                data.push([shortId, description, probability, type, gate, inputs]);
+            });
+            const worksheet = XLSX.utils.aoa_to_sheet(data);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "FTA Analisis");
+            XLSX.writeFile(workbook, "AnalisisFTA.xlsx");
+        }
+
+        function populateFtaFromJSON(jsonData) {
+            if (jsonData.length === 0) return;
+            
+            const findRowValue = (key) => {
+                const row = jsonData.find(r => r[0] === key);
+                return row && row.length > 1 ? row[1] : "";
+            };
+
+            document.getElementById('ftaTopEventDesc').value = findRowValue("FTATopEventDesc");
+            document.getElementById('ftaTopEventGate').value = findRowValue("FTATopEventGate") || "OR";
+            document.getElementById('ftaTopEventInputs').value = findRowValue("FTATopEventInputs");
+
+            jsonData.forEach(row => {
+                if (["FTATopEventDesc", "FTATopEventProb", "FTATopEventGate", "FTATopEventInputs"].includes(row[0]) || row.length < 4) return; 
+                
+                const shortIdFromFile = row[0]; 
+                const description = row[1];
+                const probability = row[2]; 
+                const type = row[3];
+                const gate = row[4] || 'OR'; 
+                const inputs = row[5] || '';
+
+                addFtaElementInput(); 
+                const newElementGroup = document.getElementById(`fta-node-${ftaNodeCounter}`); 
+                if (newElementGroup) {
+                    newElementGroup.querySelector('.fta-element-desc').value = description;
+                    const typeSelect = newElementGroup.querySelector('.fta-element-type');
+                    typeSelect.value = type;
+                    toggleFtaGateInput(`fta-node-${ftaNodeCounter}`); 
+                    
+                    if (type === 'BASIC') {
+                         newElementGroup.querySelector('.fta-element-prob').value = probability;
+                    } else if (type === 'INTERMEDIATE') {
+                        newElementGroup.querySelector('.fta-element-gate').value = gate;
+                        newElementGroup.querySelector('.fta-element-inputs').value = inputs;
+                        newElementGroup.querySelector('.fta-element-prob').value = ''; 
+                    }
+                }
+            });
+            renderFtaDiagram();
+        }
+
+        function generateCurrentDiagram() {
+            if (activeTab === 'bowtie') {
+                renderBowTieDiagram();
+            } else if (activeTab === 'fta') {
+                renderFtaDiagram();
+            }
+        }
     </script>
 </body>
 </html>
