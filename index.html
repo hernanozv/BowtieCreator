@@ -13,6 +13,7 @@
             font-family: 'Inter', sans-serif;
             background-color: #f5f5f5; /* Fondo general gris muy claro */
         }
+        /* Helpers JS movidos al <script> para evitar errores CSS */
         .corp-header {
             background-color: #ffffff;
             border-bottom: 4px solid #FFF159; /* Acento amarillo Mercado Libre */
@@ -410,6 +411,89 @@
         let impactCounter = 0;
         let ftaNodeCounter = 0;
 
+        // --- Auto-actualización del diagrama BowTie con debounce ---
+        function debounce(fn, delay = 300) {
+            let t;
+            return (...args) => {
+                clearTimeout(t);
+                t = setTimeout(() => fn.apply(null, args), delay);
+            };
+        }
+        const debouncedRenderBowTie = debounce(() => {
+            if (activeTab === 'bowtie') {
+                renderBowTieDiagram(false); // no desplazar al diagrama durante auto-actualización
+            }
+        }, 300);
+        // Entradas que deben refrescar el diagrama al escribir
+        document.getElementById('riskEvent').addEventListener('input', debouncedRenderBowTie);
+        document.getElementById('causesContainer').addEventListener('input', debouncedRenderBowTie, true);
+        document.getElementById('impactsContainer').addEventListener('input', debouncedRenderBowTie, true);
+
+        // --- Reordenación por arrastrar y soltar (HTML5 DnD) ---
+        let bowtieDrag = { el: null, type: null };
+        let dndIdCounter = 0;
+        function getOrAssignDndId(el) {
+            if (!el) return '';
+            if (!el.dataset.dndId) el.dataset.dndId = `dnd-${++dndIdCounter}`;
+            return el.dataset.dndId;
+        }
+        function enableDnDForContainer(container, itemSelector, typeKey) {
+            const containerEl = typeof container === 'string' ? document.querySelector(container) : container;
+            if (!containerEl) return;
+            const dndType = typeKey || getOrAssignDndId(containerEl);
+
+            if (!containerEl.dataset.dndBound) {
+                containerEl.addEventListener('dragover', (e) => {
+                    if (bowtieDrag.type === dndType) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                    }
+                });
+                containerEl.addEventListener('drop', (e) => {
+                    if (bowtieDrag.el && bowtieDrag.type === dndType) {
+                        e.preventDefault();
+                        containerEl.appendChild(bowtieDrag.el);
+                        debouncedRenderBowTie();
+                    }
+                });
+                containerEl.dataset.dndBound = '1';
+            }
+
+            containerEl.querySelectorAll(itemSelector).forEach((item) => {
+                if (item.dataset.dndItemBound === '1') return;
+                item.draggable = true;
+                item.classList.add('cursor-move');
+                item.addEventListener('dragstart', (e) => {
+                    bowtieDrag.el = item;
+                    bowtieDrag.type = dndType;
+                    e.dataTransfer.effectAllowed = 'move';
+                    try { e.dataTransfer.setData('text/plain', 'move'); } catch (_) {}
+                    item.classList.add('opacity-50');
+                });
+                item.addEventListener('dragend', () => {
+                    item.classList.remove('opacity-50');
+                    bowtieDrag.el = null;
+                });
+                item.addEventListener('dragover', (e) => {
+                    if (bowtieDrag.el && bowtieDrag.type === dndType) {
+                        e.preventDefault();
+                        const rect = item.getBoundingClientRect();
+                        const offset = e.clientY - (rect.top + rect.height / 2);
+                        const parent = item.parentNode;
+                        if (offset < 0) parent.insertBefore(bowtieDrag.el, item);
+                        else parent.insertBefore(bowtieDrag.el, item.nextSibling);
+                    }
+                });
+                item.addEventListener('drop', (e) => {
+                    if (bowtieDrag.el && bowtieDrag.type === dndType) {
+                        e.preventDefault();
+                        debouncedRenderBowTie();
+                    }
+                });
+                item.dataset.dndItemBound = '1';
+            });
+        }
+
         function validatePercentageInput(inputElement) {
             let value = parseInt(inputElement.value);
             if (isNaN(value) && inputElement.value !== "") { 
@@ -449,6 +533,12 @@
                 </div>
             `;
             container.appendChild(div);
+            if (typeof debouncedRenderBowTie === 'function') debouncedRenderBowTie();
+            // habilitar DnD para causas
+            enableDnDForContainer(container, '.cause-input-group');
+            // foco automático en el nombre de la causa
+            const nameInput = div.querySelector('.cause-name-input');
+            if (nameInput) { try { nameInput.focus(); nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {} }
             return div;
         }
 
@@ -464,7 +554,12 @@
                 <button onclick="removeElement(this.parentElement)" class="text-red-400 hover:text-red-600 text-xs">Quitar</button>
             `;
             barriersContainer.appendChild(barrierDiv);
-            return barrierDiv.querySelector('.preventive-barrier-input');
+            if (typeof debouncedRenderBowTie === 'function') debouncedRenderBowTie();
+            // habilitar DnD para barreras preventivas dentro de esta causa
+            enableDnDForContainer(barriersContainer, '.barrier-input-item');
+            const inputEl = barrierDiv.querySelector('.preventive-barrier-input');
+            if (inputEl) { try { inputEl.focus(); inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {} }
+            return inputEl;
         }
 
         function addImpactInput() {
@@ -491,6 +586,12 @@
                 </div>
             `;
             container.appendChild(div);
+            if (typeof debouncedRenderBowTie === 'function') debouncedRenderBowTie();
+            // habilitar DnD para consecuencias
+            enableDnDForContainer(container, '.impact-input-group');
+            // foco automático en el nombre de la consecuencia
+            const nameInput = div.querySelector('.impact-name-input');
+            if (nameInput) { try { nameInput.focus(); nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {} }
             return div;
         }
 
@@ -506,15 +607,21 @@
                 <button onclick="removeElement(this.parentElement)" class="text-red-400 hover:text-red-600 text-xs">Quitar</button>
             `;
             barriersContainer.appendChild(barrierDiv);
-            return barrierDiv.querySelector('.mitigative-barrier-input');
+            if (typeof debouncedRenderBowTie === 'function') debouncedRenderBowTie();
+            // habilitar DnD para barreras mitigantes dentro de esta consecuencia
+            enableDnDForContainer(barriersContainer, '.barrier-input-item');
+            const inputEl = barrierDiv.querySelector('.mitigative-barrier-input');
+            if (inputEl) { try { inputEl.focus(); inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {} }
+            return inputEl;
         }
 
         function removeElement(elementOrId) {
             const element = typeof elementOrId === 'string' ? document.getElementById(elementOrId) : elementOrId;
             if (element) { element.remove(); }
+            if (typeof debouncedRenderBowTie === 'function') debouncedRenderBowTie();
         }
 
-        function renderBowTieDiagram() {
+        function renderBowTieDiagram(scrollIntoView = true) {
             const riskEventName = document.getElementById('riskEvent').value || "EVENTO CENTRAL";
             document.getElementById('eventBoxDiagram').textContent = riskEventName;
             const causesContainerDiagram = document.getElementById('causesContainerForDiagram');
@@ -524,18 +631,19 @@
 
             document.querySelectorAll('.cause-input-group').forEach(group => {
                 const causeName = group.querySelector('.cause-name-input').value || "Causa";
+                const causeRefId = group.id;
                 const preventiveBarriers = Array.from(group.querySelectorAll('.preventive-barrier-input'))
                                                .map(input => input.value).filter(value => value.trim() !== "");
                 const causeDiagramItem = document.createElement('div');
                 causeDiagramItem.className = 'cause-item flex flex-col md:flex-row items-center justify-start w-full p-1 gap-1 md:gap-2'; 
-                let barriersHTML = preventiveBarriers.length > 0 ? preventiveBarriers.map(barrier => 
+                let barriersHTML = preventiveBarriers.length > 0 ? preventiveBarriers.map((barrier, idx) => 
                     `<div class="flex items-center justify-end w-full">
-                        <div class="barrier-box bg-slate-200 text-slate-800 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left">${barrier}</div>
+                        <div class="barrier-box bg-slate-200 text-slate-800 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left cursor-pointer" onclick="focusBowtieBarrier('${causeRefId}', 'preventive', ${idx})">${barrier}</div>
                         <div class="barrier-line preventive-barrier-line ml-1"></div>
                     </div>`
                 ).join('<div class="h-1"></div>') : '<div class="text-xs text-sky-200 italic text-center w-full">Sin barreras</div>';
                 causeDiagramItem.innerHTML = `
-                    <div class="cause-box bg-sky-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-1">${causeName}</div>
+                    <div class="cause-box bg-sky-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-1 cursor-pointer" onclick="focusBowtieGroup('${causeRefId}')">${causeName}</div>
                     <div class="preventive-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-2 items-stretch">
                         ${barriersHTML}
                     </div>`;
@@ -544,26 +652,60 @@
 
             document.querySelectorAll('.impact-input-group').forEach(group => {
                 const impactName = group.querySelector('.impact-name-input').value || "Consecuencia";
+                const impactRefId = group.id;
                 const mitigativeBarriers = Array.from(group.querySelectorAll('.mitigative-barrier-input'))
                                                .map(input => input.value).filter(value => value.trim() !== "");
                 const impactDiagramItem = document.createElement('div');
                 impactDiagramItem.className = 'impact-item flex flex-col md:flex-row items-center justify-end w-full p-1 gap-1 md:gap-2';
-                let barriersHTML = mitigativeBarriers.length > 0 ? mitigativeBarriers.map(barrier => 
+                let barriersHTML = mitigativeBarriers.length > 0 ? mitigativeBarriers.map((barrier, idx) => 
                     `<div class="flex items-center justify-start w-full">
                         <div class="barrier-line mitigative-barrier-line mr-1"></div>
-                        <div class="barrier-box bg-slate-200 text-slate-800 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left">${barrier}</div>
+                        <div class="barrier-box bg-slate-200 text-slate-800 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left cursor-pointer" onclick="focusBowtieBarrier('${impactRefId}', 'mitigative', ${idx})">${barrier}</div>
                     </div>`
                 ).join('<div class="h-1"></div>') : '<div class="text-xs text-rose-200 italic text-center w-full">Sin barreras</div>';
                 impactDiagramItem.innerHTML = `
                     <div class="mitigative-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-1 items-stretch">
                         ${barriersHTML}
                     </div>
-                    <div class="impact-box bg-rose-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-2">${impactName}</div>`;
+                    <div class="impact-box bg-rose-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-2 cursor-pointer" onclick="focusBowtieGroup('${impactRefId}')">${impactName}</div>`;
                 impactsContainerDiagram.appendChild(impactDiagramItem);
             });
-            if (document.getElementById('bowtieDiagramVisualization')) {
+            if (scrollIntoView && document.getElementById('bowtieDiagramVisualization')) {
                  document.getElementById('bowtieDiagramVisualization').scrollIntoView({ behavior: 'smooth' });
             }
+        }
+        
+        // --- Edición desde el diagrama: helpers para enfocar campos originales ---
+        function focusInputAndFlash(el) {
+            if (!el) return;
+            try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
+            try { el.focus({ preventScroll: true }); } catch (_) { try { el.focus(); } catch (_) {} }
+            const prev = el.className;
+            el.className = (prev + ' ring-2 ring-yellow-400 transition').trim();
+            setTimeout(() => { el.className = prev; }, 900);
+        }
+        function focusBowtieGroup(groupId) {
+            const group = document.getElementById(groupId);
+            if (!group) return;
+            let target = null;
+            if (group.classList.contains('cause-input-group')) {
+                target = group.querySelector('.cause-name-input');
+            } else if (group.classList.contains('impact-input-group')) {
+                target = group.querySelector('.impact-name-input');
+            }
+            if (!target) {
+                // Fallback: cualquier input de texto, evitando botones
+                target = group.querySelector('input, textarea, select');
+            }
+            focusInputAndFlash(target || group);
+        }
+        function focusBowtieBarrier(groupId, barrierType, index) {
+            const group = document.getElementById(groupId);
+            if (!group) return;
+            const selector = barrierType === 'preventive' ? '.preventive-barrier-input' : '.mitigative-barrier-input';
+            const inputs = group.querySelectorAll(selector);
+            const target = inputs && inputs[index] ? inputs[index] : null;
+            focusInputAndFlash(target);
         }
         
         function exportBowtieDiagramImage() {
