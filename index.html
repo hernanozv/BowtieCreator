@@ -127,6 +127,9 @@
             border-radius: 9999px;
         }
         .connector-svg svg { display: block; }
+        /* Mejor definición en conectores */
+        .connector-svg svg { shape-rendering: geometricPrecision; }
+        .connector-svg svg line { stroke-linecap: round; }
         /* Cuñas triangulares y rótulos de fase */
         #threatsSide, #consequencesSide { position: relative; overflow: hidden; }
         #threatsSide::before {
@@ -291,6 +294,15 @@
           line-height: 1.1 !important; /* evitar clipping pero mantener métrica estable */
           vertical-align: middle !important; /* alinear inline elements */
           font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif !important; /* evitar métricas problemáticas durante export */
+          text-rendering: geometricPrecision !important; /* mejorar nitidez del texto */
+          -webkit-font-smoothing: antialiased !important;
+          -moz-osx-font-smoothing: grayscale !important;
+        }
+        /* Evitar blur por transform durante exportación */
+        #bowtieDiagramVisualization.exporting .diagram-box,
+        #bowtieDiagram.exporting .diagram-box {
+          transform: none !important;
+          box-shadow: none !important;
         }
         #bowtieDiagramVisualization.exporting #eventBoxDiagram,
         #bowtieDiagramVisualization.exporting .cause-box,
@@ -976,7 +988,10 @@
             node.classList.add('exporting');
             innerDiagram.classList.add('exporting');
 
-            const scale = Math.max(window.devicePixelRatio || 1, 2);
+            // Escala dinámica para mejorar definición apuntando a ~3200px de ancho final
+            const targetPx = 3200;
+            const baseScale = Math.max(1, targetPx / Math.max(1, innerDiagram.scrollWidth));
+            const scale = Math.min(4, Math.max(window.devicePixelRatio || 1, 2, baseScale));
 
             // Esperar a que las fuentes estén listas (si el navegador lo soporta)
             try {
