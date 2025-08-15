@@ -7,6 +7,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         /* --- NUEVA PALETA DE COLORES CORPORATIVA Y SOBRIA --- */
         body {
@@ -106,6 +109,46 @@
         }
         .preventive-barrier-line { background-color: #7dd3fc; }
         .mitigative-barrier-line { background-color: #fca5a5; }
+        /* Conectores y formas inspiradas en BowTie de referencia */
+        #eventBoxDiagram {
+            border-radius: 9999px;
+            aspect-ratio: 1 / 1;
+            min-width: 120px;
+            min-height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+        }
+        .cause-box, .impact-box {
+            border-radius: 9999px;
+        }
+        .barrier-box {
+            border-radius: 9999px;
+        }
+        .connector-svg svg { display: block; }
+        /* Cuñas triangulares y rótulos de fase */
+        #threatsSide, #consequencesSide { position: relative; overflow: hidden; }
+        #threatsSide::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.12);
+            clip-path: polygon(0% 0%, 100% 50%, 0% 100%);
+            z-index: 0;
+            pointer-events: none;
+        }
+        #consequencesSide::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.12);
+            clip-path: polygon(100% 0%, 0% 50%, 100% 100%);
+            z-index: 0;
+            pointer-events: none;
+        }
+        #threatsSide::after { content: none; }
+        #consequencesSide::after { content: none; }
         /* Indicador de efectividad de barreras */
         .eff-dot {
             display: inline-block;
@@ -238,6 +281,32 @@
         }
         input[type=number] {
           -moz-appearance: textfield;
+          appearance: textfield; /* lint: add standard property */
+        }
+        /* Estilos temporales aplicados SOLO durante la exportación de imagen */
+        #bowtieDiagramVisualization.exporting,
+        #bowtieDiagramVisualization.exporting *,
+        #bowtieDiagram.exporting,
+        #bowtieDiagram.exporting * {
+          line-height: 1.1 !important; /* evitar clipping pero mantener métrica estable */
+          vertical-align: middle !important; /* alinear inline elements */
+          font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif !important; /* evitar métricas problemáticas durante export */
+        }
+        #bowtieDiagramVisualization.exporting #eventBoxDiagram,
+        #bowtieDiagramVisualization.exporting .cause-box,
+        #bowtieDiagramVisualization.exporting .impact-box,
+        #bowtieDiagram.exporting #eventBoxDiagram,
+        #bowtieDiagram.exporting .cause-box,
+        #bowtieDiagram.exporting .impact-box {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+        /* Barreras: alinear ícono y texto verticalmente durante la exportación */
+        #bowtieDiagramVisualization.exporting .barrier-box,
+        #bowtieDiagram.exporting .barrier-box {
+          display: inline-flex !important;
+          align-items: center !important;
         }
     </style>
 </head>
@@ -802,6 +871,12 @@
                     <div class="cause-box bg-sky-400 p-2 rounded-lg shadow-sm text-center diagram-box w-full md:w-1/2 order-1 cursor-pointer transition duration-150 ease-out transform hover:shadow-sm hover:-translate-y-px" onclick="focusBowtieGroup('${causeRefId}')">${causeName}</div>
                     <div class="preventive-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-2 items-stretch">
                         ${barriersHTML}
+                    </div>
+                    <div class="connector-svg hidden md:flex items-center justify-center md:w-12 order-3" aria-hidden="true">
+                        <svg class="w-12 h-3" viewBox="0 0 48 12">
+                            <line x1="0" y1="6" x2="36" y2="6" stroke="#ffffff" stroke-opacity="0.95" stroke-width="2"></line>
+                            <polygon points="36,2 46,6 36,10" fill="#ffffff" fill-opacity="0.95"></polygon>
+                        </svg>
                     </div>`;
                 causesContainerDiagram.appendChild(causeDiagramItem);
             });
@@ -829,7 +904,13 @@
                     <div class="mitigative-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-1 items-stretch">
                         ${barriersHTML}
                     </div>
-                    <div class="impact-box bg-rose-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-2 cursor-pointer transition duration-150 ease-out transform hover:shadow-md hover:-translate-y-px" onclick="focusBowtieGroup('${impactRefId}')">${impactName}</div>`;
+                    <div class="connector-svg hidden md:flex items-center justify-center md:w-12 order-2" aria-hidden="true">
+                        <svg class="w-12 h-3" viewBox="0 0 48 12">
+                            <line x1="0" y1="6" x2="36" y2="6" stroke="#ffffff" stroke-opacity="0.95" stroke-width="2"></line>
+                            <polygon points="36,2 46,6 36,10" fill="#ffffff" fill-opacity="0.95"></polygon>
+                        </svg>
+                    </div>
+                    <div class="impact-box bg-rose-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-3 cursor-pointer transition duration-150 ease-out transform hover:shadow-md hover:-translate-y-px" onclick="focusBowtieGroup('${impactRefId}')">${impactName}</div>`;
                 impactsContainerDiagram.appendChild(impactDiagramItem);
             });
             if (scrollIntoView && document.getElementById('bowtieDiagramVisualization')) {
@@ -885,19 +966,108 @@
             debouncedRenderBowTie();
         }
         
-        function exportBowtieDiagramImage() {
+        async function exportBowtieDiagramImage() {
             const node = document.getElementById('bowtieDiagramVisualization');
-            if (!node) return;
+            const innerDiagram = document.getElementById('bowtieDiagram');
+            if (!node || !innerDiagram) return;
 
             const prevBg = node.style.backgroundColor;
             node.style.backgroundColor = '#ffffff';
+            node.classList.add('exporting');
+            innerDiagram.classList.add('exporting');
 
-            const scale = Math.max(window.devicePixelRatio || 1, 2) * 1.5;
+            const scale = Math.max(window.devicePixelRatio || 1, 2);
 
-            html2canvas(node, {
+            // Esperar a que las fuentes estén listas (si el navegador lo soporta)
+            try {
+                if (document.fonts && document.fonts.ready) {
+                    await document.fonts.ready;
+                }
+            } catch (_) { /* ignore */ }
+
+            // Asegurar que los estilos .exporting se apliquen y el layout esté asentado
+            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+            html2canvas(innerDiagram, {
                 backgroundColor: '#ffffff',
                 scale,
                 useCORS: true,
+                letterRendering: true,
+                imageTimeout: 15000,
+                removeContainer: true,
+                width: innerDiagram.scrollWidth,
+                height: innerDiagram.scrollHeight,
+                onclone: (clonedDoc) => {
+                    try {
+                        const clonedDiagram = clonedDoc.getElementById('bowtieDiagram');
+                        if (!clonedDiagram) return;
+                        // Forzar estilos base
+                        const style = clonedDoc.createElement('style');
+                        style.textContent = `
+                          #bowtieDiagram, #bowtieDiagram * {
+                            line-height: 1.1 !important;
+                            vertical-align: middle !important;
+                            -webkit-font-smoothing: antialiased !important;
+                            -moz-osx-font-smoothing: grayscale !important;
+                            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif !important;
+                          }
+                          /* Centrado vertical por tabla para cajas principales */
+                          #bowtieDiagram #eventBoxDiagram,
+                          #bowtieDiagram .cause-box,
+                          #bowtieDiagram .impact-box {
+                            display: table-cell !important;
+                            vertical-align: middle !important;
+                            text-align: center !important;
+                          }
+                          /* Barreras: mantener alineación de ícono/texto */
+                          #bowtieDiagram .barrier-box {
+                            display: inline-flex !important;
+                            align-items: center !important;
+                            justify-content: flex-start !important;
+                          }
+                        `;
+                        clonedDoc.head.appendChild(style);
+
+                        // Congelar alto y centrar verticalmente cajas clave
+                        const centerSelectors = ['#eventBoxDiagram', '.cause-box', '.impact-box'];
+                        centerSelectors.forEach(sel => {
+                            clonedDiagram.querySelectorAll(sel).forEach(el => {
+                                const rect = el.getBoundingClientRect();
+                                el.style.height = rect.height + 'px';
+                                el.style.lineHeight = rect.height + 'px';
+                                el.style.display = 'block';
+                                el.style.paddingTop = '0px';
+                                el.style.paddingBottom = '0px';
+                                el.style.textAlign = 'center';
+                                el.style.whiteSpace = 'nowrap';
+                                el.style.overflow = 'hidden';
+                                el.style.textOverflow = 'ellipsis';
+                            });
+                        });
+                        // Congelar altura y centrar verticalmente barreras
+                        clonedDiagram.querySelectorAll('.barrier-box').forEach(el => {
+                            const rect = el.getBoundingClientRect();
+                            el.style.minHeight = rect.height + 'px';
+                            el.style.display = 'flex';
+                            el.style.alignItems = 'center';
+                            // En algunos navegadores, los nodos de texto como items flex no se centran igual al rasterizar.
+                            // Envuelve el texto en un span con line-height fijo para asegurar centrado perfecto.
+                            const textNodes = Array.from(el.childNodes).filter(n => n.nodeType === 3 && n.textContent.trim().length > 0);
+                            if (textNodes.length) {
+                                const combined = textNodes.map(n => n.textContent).join(' ').replace(/\s+/g, ' ').trim();
+                                textNodes.forEach(n => el.removeChild(n));
+                                const span = clonedDoc.createElement('span');
+                                span.className = 'barrier-text-export';
+                                span.textContent = combined;
+                                span.style.display = 'inline-block';
+                                span.style.lineHeight = rect.height + 'px';
+                                span.style.whiteSpace = 'nowrap';
+                                span.style.marginLeft = '4px';
+                                el.appendChild(span);
+                            }
+                        });
+                    } catch (_) { /* ignore */ }
+                },
                 ignoreElements: (el) => el.dataset && el.dataset.exportIgnore === 'true'
             }).then(canvas => {
                 const link = document.createElement('a');
@@ -912,6 +1082,8 @@
                 });
             }).finally(() => {
                 node.style.backgroundColor = prevBg || '';
+                node.classList.remove('exporting');
+                innerDiagram.classList.remove('exporting');
             });
         }
         
