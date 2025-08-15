@@ -114,6 +114,8 @@
             border-radius: 9999px;
             margin-right: 6px;
             vertical-align: middle;
+            /* Halo para mejorar contraste en cualquier fondo */
+            box-shadow: 0 0 0 2px rgba(255,255,255,0.85);
         }
         .eff-high { background-color: #16a34a; }   /* verde */
         .eff-medium { background-color: #f59e0b; } /* ámbar */
@@ -301,7 +303,12 @@
                 </section>
                 <section id="bowtieDiagramVisualization" class="mt-12 p-4 md:p-6 section-card min-h-[400px]">
                     <div class="grid grid-cols-3 items-center mb-6 border-b pb-2">
-                        <div></div>
+                        <div class="hidden sm:flex items-center gap-3 text-xs text-gray-600" aria-label="Leyenda de efectividad de barreras">
+                            <span class="mr-2 font-medium text-gray-700">Efectividad de la barrera:</span>
+                            <span class="flex items-center"><span class="eff-dot eff-high" aria-hidden="true"></span>Alta</span>
+                            <span class="flex items-center"><span class="eff-dot eff-medium" aria-hidden="true"></span>Media</span>
+                            <span class="flex items-center"><span class="eff-dot eff-low" aria-hidden="true"></span>Baja</span>
+                        </div>
                         <h2 class="text-2xl font-semibold text-center section-title">Diagrama Bow-Tie</h2>
                         <div class="text-right">
                             <button type="button" data-export-ignore="true" onclick="exportBowtieDiagramImage()" class="action-button action-button-secondary">
@@ -315,7 +322,7 @@
                             <div id="causesContainerForDiagram" class="space-y-2 w-full flex flex-col items-center"></div>
                         </div>
                         <div id="eventSide" class="w-full md:w-1/5 flex flex-col items-center justify-center p-2 md:p-4 my-4 md:my-0">
-                            <div id="eventBoxDiagram" class="bg-red-600 text-white p-4 md:p-6 rounded-xl text-center font-bold text-lg md:text-xl shadow-xl min-h-[80px] flex items-center justify-center diagram-box">
+                            <div id="eventBoxDiagram" class="bg-[#FFF159] text-gray-900 border border-yellow-300 p-4 md:p-6 rounded-xl text-center font-bold text-lg md:text-xl shadow-xl min-h-[80px] flex items-center justify-center diagram-box">
                                 EVENTO
                             </div>
                         </div>
@@ -787,7 +794,7 @@
                     const effClass = b.eff === 'high' ? 'eff-high' : (b.eff === 'low' ? 'eff-low' : 'eff-medium');
                     const effLabel = b.eff === 'high' ? 'Alta' : (b.eff === 'low' ? 'Baja' : 'Media');
                     return `<div class="flex items-center justify-end w-full">
-                        <div class="barrier-box bg-slate-200 text-slate-800 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left cursor-pointer" onclick="focusBowtieBarrier('${causeRefId}', 'preventive', ${idx})"><span class=\"eff-dot ${effClass}\" title=\"Efectividad: ${effLabel}\"></span>${b.text}</div>
+                        <div class="barrier-box bg-sky-50 text-sky-900 border border-sky-200 hover:bg-sky-100 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left cursor-pointer" onclick="focusBowtieBarrier('${causeRefId}', 'preventive', ${idx})"><span class=\"eff-dot ${effClass}\" title=\"Efectividad: ${effLabel}\"></span>${b.text}</div>
                         <div class="barrier-line preventive-barrier-line ml-1"></div>
                     </div>`;
                 }).join('<div class="h-1"></div>') : '<div class="text-xs text-sky-200 italic text-center w-full">Sin barreras</div>';
@@ -815,7 +822,7 @@
                     const effLabel = b.eff === 'high' ? 'Alta' : (b.eff === 'low' ? 'Baja' : 'Media');
                     return `<div class="flex items-center justify-start w-full">
                         <div class="barrier-line mitigative-barrier-line mr-1"></div>
-                        <div class="barrier-box bg-slate-200 text-slate-800 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left cursor-pointer" onclick="focusBowtieBarrier('${impactRefId}', 'mitigative', ${idx})"><span class=\"eff-dot ${effClass}\" title=\"Efectividad: ${effLabel}\"></span>${b.text}</div>
+                        <div class="barrier-box bg-rose-50 text-rose-900 border border-rose-200 hover:bg-rose-100 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left cursor-pointer" onclick="focusBowtieBarrier('${impactRefId}', 'mitigative', ${idx})"><span class=\"eff-dot ${effClass}\" title=\"Efectividad: ${effLabel}\"></span>${b.text}</div>
                     </div>`;
                 }).join('<div class="h-1"></div>') : '<div class="text-xs text-rose-200 italic text-center w-full">Sin barreras</div>';
                 impactDiagramItem.innerHTML = `
