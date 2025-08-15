@@ -106,6 +106,13 @@
         }
         .preventive-barrier-line { background-color: #7dd3fc; }
         .mitigative-barrier-line { background-color: #fca5a5; }
+        /* Placeholder visual para DnD de barreras */
+        .barrier-placeholder {
+            border: 2px dashed #9ca3af;
+            border-radius: 0.375rem;
+            background-color: #f3f4f6;
+            margin: 4px 0;
+        }
 
         .modal {
             transition: opacity 0.25s ease;
@@ -229,7 +236,7 @@
         </header>
 
         <div class="flex flex-col sm:flex-row flex-wrap justify-center items-center space-y-3 sm:space-y-0 sm:space-x-3 mb-8 pb-4 border-b border-gray-200">
-            <button onclick="generateCurrentDiagram()" class="action-button action-button-primary">
+            <button id="generateBtn" onclick="generateCurrentDiagram()" class="action-button action-button-primary">
                 Generar/Actualizar Diagrama
             </button>
             <button onclick="exportCurrentAnalysis()" class="action-button action-button-secondary">
@@ -402,10 +409,22 @@
                     tabButtons[id].setAttribute('aria-selected', 'false');
                 }
             }
+            // Ocultar botón de generar en BowTie, mostrar en FTA
+            const generateBtn = document.getElementById('generateBtn');
+            if (generateBtn) {
+                if (tabId === 'bowtie') generateBtn.classList.add('hidden');
+                else generateBtn.classList.remove('hidden');
+            }
         }
         tabButtons.bowtie.addEventListener('click', () => showTab('bowtie'));
         tabButtons.fta.addEventListener('click', () => showTab('fta'));
         showTab('bowtie'); 
+        // Habilitar DnD en contenedores de barreras existentes al inicio
+        function enableDndForAllBarrierContainers() {
+            document.querySelectorAll('.preventive-barriers-container, .mitigative-barriers-container')
+                .forEach(c => enableDnDForContainer(c, '.barrier-input-item'));
+        }
+        enableDndForAllBarrierContainers();
 
         let causeCounter = 0;
         let impactCounter = 0;
@@ -430,7 +449,7 @@
         document.getElementById('impactsContainer').addEventListener('input', debouncedRenderBowTie, true);
 
         // --- Reordenación por arrastrar y soltar (HTML5 DnD) ---
-        let bowtieDrag = { el: null, type: null };
+        let bowtieDrag = { el: null, type: null, placeholder: null, container: null };
         let dndIdCounter = 0;
         function getOrAssignDndId(el) {
             if (!el) return '';
@@ -443,16 +462,44 @@
             const dndType = typeKey || getOrAssignDndId(containerEl);
 
             if (!containerEl.dataset.dndBound) {
+                containerEl.addEventListener('dragenter', (e) => {
+                    if (bowtieDrag.el && bowtieDrag.type === dndType) {
+                        e.preventDefault();
+                    }
+                });
                 containerEl.addEventListener('dragover', (e) => {
-                    if (bowtieDrag.type === dndType) {
+                    if (bowtieDrag.el && bowtieDrag.type === dndType) {
                         e.preventDefault();
                         e.dataTransfer.dropEffect = 'move';
+                        // Para barreras, mover el placeholder (no el elemento oculto)
+                        if (itemSelector === '.barrier-input-item' && bowtieDrag.placeholder) {
+                            const y = e.clientY;
+                            const items = Array.from(containerEl.querySelectorAll(itemSelector))
+                                               .filter(n => n !== bowtieDrag.el && n !== bowtieDrag.placeholder);
+                            let beforeNode = null; let maxNeg = -Infinity;
+                            for (const n of items) {
+                                const rect = n.getBoundingClientRect();
+                                const offset = y - (rect.top + rect.height / 2);
+                                if (offset < 0 && offset > maxNeg) { maxNeg = offset; beforeNode = n; }
+                            }
+                            if (beforeNode) containerEl.insertBefore(bowtieDrag.placeholder, beforeNode);
+                            else containerEl.appendChild(bowtieDrag.placeholder);
+                        }
                     }
                 });
                 containerEl.addEventListener('drop', (e) => {
                     if (bowtieDrag.el && bowtieDrag.type === dndType) {
                         e.preventDefault();
-                        containerEl.appendChild(bowtieDrag.el);
+                        // Finalizar DnD de barreras usando el placeholder
+                        if (itemSelector === '.barrier-input-item' && bowtieDrag.placeholder) {
+                            try {
+                                containerEl.insertBefore(bowtieDrag.el, bowtieDrag.placeholder);
+                            } catch(_) {}
+                            bowtieDrag.el.style.display = '';
+                            bowtieDrag.placeholder.remove();
+                            bowtieDrag.placeholder = null;
+                            bowtieDrag.container = null;
+                        }
                         debouncedRenderBowTie();
                     }
                 });
@@ -461,32 +508,68 @@
 
             containerEl.querySelectorAll(itemSelector).forEach((item) => {
                 if (item.dataset.dndItemBound === '1') return;
-                item.draggable = true;
-                item.classList.add('cursor-move');
-                item.addEventListener('dragstart', (e) => {
+                // Para barreras, arrastre desde toda la fila (sin asa); para otras, también la fila
+                let dragStarterEl = item;
+                if (item.classList.contains('barrier-input-item')) {
+                    // Toda la fila es arrastrable (sin asa)
+                    item.draggable = true;
+                }
+                dragStarterEl.draggable = true;
+                dragStarterEl.addEventListener('dragstart', (e) => {
                     bowtieDrag.el = item;
                     bowtieDrag.type = dndType;
+                    bowtieDrag.container = containerEl;
                     e.dataTransfer.effectAllowed = 'move';
                     try { e.dataTransfer.setData('text/plain', 'move'); } catch (_) {}
-                    item.classList.add('opacity-50');
-                });
-                item.addEventListener('dragend', () => {
-                    item.classList.remove('opacity-50');
-                    bowtieDrag.el = null;
-                });
-                item.addEventListener('dragover', (e) => {
-                    if (bowtieDrag.el && bowtieDrag.type === dndType) {
-                        e.preventDefault();
+                    item.classList.add('opacity-50', 'dragging');
+                    // Crear placeholder visual para barreras
+                    if (item.classList.contains('barrier-input-item') && !bowtieDrag.placeholder) {
                         const rect = item.getBoundingClientRect();
-                        const offset = e.clientY - (rect.top + rect.height / 2);
-                        const parent = item.parentNode;
-                        if (offset < 0) parent.insertBefore(bowtieDrag.el, item);
-                        else parent.insertBefore(bowtieDrag.el, item.nextSibling);
+                        const ph = document.createElement('div');
+                        ph.className = 'barrier-placeholder';
+                        ph.style.height = rect.height + 'px';
+                        try { containerEl.insertBefore(ph, item.nextSibling); } catch(_) {}
+                        bowtieDrag.placeholder = ph;
+                        // Ocultar el item original para que el placeholder represente su lugar
+                        item.style.display = 'none';
                     }
                 });
+                dragStarterEl.addEventListener('dragend', () => {
+                    item.classList.remove('opacity-50', 'dragging');
+                    // Si se canceló fuera de drop, restaurar
+                    if (item.classList.contains('barrier-input-item') && bowtieDrag.placeholder && bowtieDrag.container) {
+                        try { bowtieDrag.container.insertBefore(item, bowtieDrag.placeholder); } catch(_) {}
+                        item.style.display = '';
+                        bowtieDrag.placeholder.remove();
+                    }
+                    bowtieDrag.placeholder = null;
+                    bowtieDrag.container = null;
+                    bowtieDrag.el = null;
+                });
+                // Reordenamiento por fila para causas y consecuencias (no barreras)
+                if (itemSelector !== '.barrier-input-item') {
+                    item.addEventListener('dragover', (e) => {
+                        if (bowtieDrag.el && bowtieDrag.type === dndType) {
+                            e.preventDefault();
+                            const rect = item.getBoundingClientRect();
+                            const offset = e.clientY - (rect.top + rect.height / 2);
+                            const parent = item.parentNode;
+                            if (offset < 0) parent.insertBefore(bowtieDrag.el, item);
+                            else parent.insertBefore(bowtieDrag.el, item.nextSibling);
+                        }
+                    });
+                }
                 item.addEventListener('drop', (e) => {
                     if (bowtieDrag.el && bowtieDrag.type === dndType) {
                         e.preventDefault();
+                        // Finalizar también aquí para el caso de barreras cuando el drop cae sobre un item
+                        if (itemSelector === '.barrier-input-item' && bowtieDrag.placeholder && bowtieDrag.container) {
+                            try { bowtieDrag.container.insertBefore(bowtieDrag.el, bowtieDrag.placeholder); } catch(_) {}
+                            bowtieDrag.el.style.display = '';
+                            bowtieDrag.placeholder.remove();
+                            bowtieDrag.placeholder = null;
+                            bowtieDrag.container = null;
+                        }
                         debouncedRenderBowTie();
                     }
                 });
@@ -521,7 +604,11 @@
             div.innerHTML = `
                 <div class="flex justify-between items-center mb-2">
                     <label class="block text-md font-medium text-gray-700">Causa ${causeCounter}:</label>
-                    <button onclick="${removeElementHandler}" class="text-red-500 hover:text-red-700 font-semibold text-sm">Eliminar Causa</button>
+                    <button onclick="${removeElementHandler}" class="inline-flex items-center justify-center p-1 text-red-500 hover:text-red-700" aria-label="Eliminar causa" title="Eliminar causa">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 100 2h.293l.853 10.24A2 2 0 007.138 18h5.724a2 2 0 001.992-1.76L15.707 6H16a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0010 2H9zm-1 6a1 1 0 112 0v7a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v7a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
                 </div>
                 <input type="text" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 cause-name-input" placeholder="Nombre de la causa">
                 <div class="mt-3">
@@ -550,8 +637,20 @@
             const barrierDiv = document.createElement('div');
             barrierDiv.className = 'flex items-center space-x-2 barrier-input-item';
             barrierDiv.innerHTML = `
+                <div class="flex items-center gap-1">
+                  <button type="button" class="p-1 text-gray-400 hover:text-gray-600" aria-label="Mover arriba" title="Mover arriba" onclick="moveBarrier(this.closest('.barrier-input-item'), 'up')">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M3 10l7-7 7 7H3z"/></svg>
+                  </button>
+                  <button type="button" class="p-1 text-gray-400 hover:text-gray-600" aria-label="Mover abajo" title="Mover abajo" onclick="moveBarrier(this.closest('.barrier-input-item'), 'down')">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M17 10l-7 7-7-7h14z"/></svg>
+                  </button>
+                </div>
                 <input type="text" class="w-full p-1 border border-gray-300 rounded-md text-sm preventive-barrier-input" placeholder="Descripción de la barrera">
-                <button onclick="removeElement(this.parentElement)" class="text-red-400 hover:text-red-600 text-xs">Quitar</button>
+                <button onclick="removeElement(this.parentElement)" class="inline-flex items-center justify-center p-1 text-red-500 hover:text-red-700" aria-label="Eliminar barrera" title="Eliminar barrera">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 100 2h.293l.853 10.24A2 2 0 007.138 18h5.724a2 2 0 001.992-1.76L15.707 6H16a 1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0010 2H9zm-1 6a1 1 0 112 0v7a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v7a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                    </svg>
+                </button>
             `;
             barriersContainer.appendChild(barrierDiv);
             if (typeof debouncedRenderBowTie === 'function') debouncedRenderBowTie();
@@ -574,7 +673,11 @@
             div.innerHTML = `
                 <div class="flex justify-between items-center mb-2">
                     <label class="block text-md font-medium text-gray-700">Consecuencia ${impactCounter}:</label>
-                    <button onclick="${removeElementHandler}" class="text-red-500 hover:text-red-700 font-semibold text-sm">Eliminar Consecuencia</button>
+                    <button onclick="${removeElementHandler}" class="inline-flex items-center justify-center p-1 text-red-500 hover:text-red-700" aria-label="Eliminar consecuencia" title="Eliminar consecuencia">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 100 2h.293l.853 10.24A2 2 0 007.138 18h5.724a2 2 0 001.992-1.76L15.707 6H16a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0010 2H9zm-1 6a1 1 0 112 0v7a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v7a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
                 </div>
                 <input type="text" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 impact-name-input" placeholder="Nombre de la Consecuencia">
                 <div class="mt-3">
@@ -603,8 +706,20 @@
             const barrierDiv = document.createElement('div');
             barrierDiv.className = 'flex items-center space-x-2 barrier-input-item';
             barrierDiv.innerHTML = `
+                <div class="flex items-center gap-1">
+                  <button type="button" class="p-1 text-gray-400 hover:text-gray-600" aria-label="Mover arriba" title="Mover arriba" onclick="moveBarrier(this.closest('.barrier-input-item'), 'up')">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M3 10l7-7 7 7H3z"/></svg>
+                  </button>
+                  <button type="button" class="p-1 text-gray-400 hover:text-gray-600" aria-label="Mover abajo" title="Mover abajo" onclick="moveBarrier(this.closest('.barrier-input-item'), 'down')">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M17 10l-7 7-7-7h14z"/></svg>
+                  </button>
+                </div>
                 <input type="text" class="w-full p-1 border border-gray-300 rounded-md text-sm mitigative-barrier-input" placeholder="Descripción de la barrera">
-                <button onclick="removeElement(this.parentElement)" class="text-red-400 hover:text-red-600 text-xs">Quitar</button>
+                <button onclick="removeElement(this.parentElement)" class="inline-flex items-center justify-center p-1 text-red-500 hover:text-red-700" aria-label="Eliminar barrera" title="Eliminar barrera">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 100 2h.293l.853 10.24A2 2 0 007.138 18h5.724a2 2 0 001.992-1.76L15.707 6H16a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0010 2H9zm-1 6a1 1 0 112 0v7a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v7a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                    </svg>
+                </button>
             `;
             barriersContainer.appendChild(barrierDiv);
             if (typeof debouncedRenderBowTie === 'function') debouncedRenderBowTie();
@@ -706,6 +821,21 @@
             const inputs = group.querySelectorAll(selector);
             const target = inputs && inputs[index] ? inputs[index] : null;
             focusInputAndFlash(target);
+        }
+
+        // Fallback: botones subir/bajar en barreras
+        function moveBarrier(barrierEl, dir) {
+            if (!barrierEl) return;
+            const parent = barrierEl.parentElement;
+            if (!parent) return;
+            if (dir === 'up') {
+                const prev = barrierEl.previousElementSibling;
+                if (prev) parent.insertBefore(barrierEl, prev);
+            } else {
+                const next = barrierEl.nextElementSibling;
+                if (next) parent.insertBefore(next, barrierEl);
+            }
+            debouncedRenderBowTie();
         }
         
         function exportBowtieDiagramImage() {
