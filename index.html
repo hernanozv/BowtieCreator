@@ -109,8 +109,8 @@
         /* Indicador de efectividad de barreras */
         .eff-dot {
             display: inline-block;
-            width: 8px;
-            height: 8px;
+            width: 12px;
+            height: 12px;
             border-radius: 9999px;
             margin-right: 6px;
             vertical-align: middle;
@@ -300,11 +300,14 @@
                     </div>
                 </section>
                 <section id="bowtieDiagramVisualization" class="mt-12 p-4 md:p-6 section-card min-h-[400px]">
-                    <div class="relative mb-6 border-b pb-2">
+                    <div class="grid grid-cols-3 items-center mb-6 border-b pb-2">
+                        <div></div>
                         <h2 class="text-2xl font-semibold text-center section-title">Diagrama Bow-Tie</h2>
-                        <button type="button" data-export-ignore="true" onclick="exportBowtieDiagramImage()" class="action-button action-button-secondary absolute right-0 top-0">
-                            Exportar imagen
-                        </button>
+                        <div class="text-right">
+                            <button type="button" data-export-ignore="true" onclick="exportBowtieDiagramImage()" class="action-button action-button-secondary">
+                                Exportar imagen
+                            </button>
+                        </div>
                     </div>
                     <div id="bowtieDiagram" class="flex flex-col md:flex-row justify-between items-stretch w-full p-2 md:p-4 min-h-[300px] gap-2 md:gap-4">
                         <div id="threatsSide" class="w-full md:w-2/5 flex flex-col items-center p-3 md:p-4 bg-sky-600 rounded-xl text-white diagram-box">
