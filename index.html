@@ -106,6 +106,18 @@
         }
         .preventive-barrier-line { background-color: #7dd3fc; }
         .mitigative-barrier-line { background-color: #fca5a5; }
+        /* Indicador de efectividad de barreras */
+        .eff-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 9999px;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        .eff-high { background-color: #16a34a; }   /* verde */
+        .eff-medium { background-color: #f59e0b; } /* ámbar */
+        .eff-low { background-color: #dc2626; }    /* rojo */
         /* Placeholder visual para DnD de barreras */
         .barrier-placeholder {
             border: 2px dashed #9ca3af;
@@ -447,6 +459,9 @@
         document.getElementById('riskEvent').addEventListener('input', debouncedRenderBowTie);
         document.getElementById('causesContainer').addEventListener('input', debouncedRenderBowTie, true);
         document.getElementById('impactsContainer').addEventListener('input', debouncedRenderBowTie, true);
+        // también refrescar cuando cambie la efectividad (select)
+        document.getElementById('causesContainer').addEventListener('change', debouncedRenderBowTie, true);
+        document.getElementById('impactsContainer').addEventListener('change', debouncedRenderBowTie, true);
 
         // --- Reordenación por arrastrar y soltar (HTML5 DnD) ---
         let bowtieDrag = { el: null, type: null, placeholder: null, container: null };
@@ -646,6 +661,11 @@
                   </button>
                 </div>
                 <input type="text" class="w-full p-1 border border-gray-300 rounded-md text-sm preventive-barrier-input" placeholder="Descripción de la barrera">
+                <select class="barrier-effectiveness text-xs border border-gray-300 rounded-md p-1 ml-1" title="Efectividad">
+                    <option value="high">Alta</option>
+                    <option value="medium" selected>Media</option>
+                    <option value="low">Baja</option>
+                </select>
                 <button onclick="removeElement(this.parentElement)" class="inline-flex items-center justify-center p-1 text-red-500 hover:text-red-700" aria-label="Eliminar barrera" title="Eliminar barrera">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
                         <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 100 2h.293l.853 10.24A2 2 0 007.138 18h5.724a2 2 0 001.992-1.76L15.707 6H16a 1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0010 2H9zm-1 6a1 1 0 112 0v7a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v7a1 1 0 11-2 0V8z" clip-rule="evenodd" />
@@ -715,6 +735,11 @@
                   </button>
                 </div>
                 <input type="text" class="w-full p-1 border border-gray-300 rounded-md text-sm mitigative-barrier-input" placeholder="Descripción de la barrera">
+                <select class="barrier-effectiveness text-xs border border-gray-300 rounded-md p-1 ml-1" title="Efectividad">
+                    <option value="high">Alta</option>
+                    <option value="medium" selected>Media</option>
+                    <option value="low">Baja</option>
+                </select>
                 <button onclick="removeElement(this.parentElement)" class="inline-flex items-center justify-center p-1 text-red-500 hover:text-red-700" aria-label="Eliminar barrera" title="Eliminar barrera">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
                         <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 100 2h.293l.853 10.24A2 2 0 007.138 18h5.724a2 2 0 001.992-1.76L15.707 6H16a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0010 2H9zm-1 6a1 1 0 112 0v7a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v7a1 1 0 11-2 0V8z" clip-rule="evenodd" />
@@ -747,16 +772,22 @@
             document.querySelectorAll('.cause-input-group').forEach(group => {
                 const causeName = group.querySelector('.cause-name-input').value || "Causa";
                 const causeRefId = group.id;
-                const preventiveBarriers = Array.from(group.querySelectorAll('.preventive-barrier-input'))
-                                               .map(input => input.value).filter(value => value.trim() !== "");
+                const preventiveItems = Array.from(group.querySelectorAll('.barrier-input-item'));
+                const preventiveBarriers = preventiveItems.map(it => {
+                    const txt = (it.querySelector('.preventive-barrier-input')?.value || '').trim();
+                    const eff = it.querySelector('.barrier-effectiveness')?.value || 'medium';
+                    return { text: txt, eff };
+                }).filter(b => b.text !== "");
                 const causeDiagramItem = document.createElement('div');
                 causeDiagramItem.className = 'cause-item flex flex-col md:flex-row items-center justify-start w-full p-1 gap-1 md:gap-2'; 
-                let barriersHTML = preventiveBarriers.length > 0 ? preventiveBarriers.map((barrier, idx) => 
-                    `<div class="flex items-center justify-end w-full">
-                        <div class="barrier-box bg-slate-200 text-slate-800 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left cursor-pointer" onclick="focusBowtieBarrier('${causeRefId}', 'preventive', ${idx})">${barrier}</div>
+                let barriersHTML = preventiveBarriers.length > 0 ? preventiveBarriers.map((b, idx) => {
+                    const effClass = b.eff === 'high' ? 'eff-high' : (b.eff === 'low' ? 'eff-low' : 'eff-medium');
+                    const effLabel = b.eff === 'high' ? 'Alta' : (b.eff === 'low' ? 'Baja' : 'Media');
+                    return `<div class="flex items-center justify-end w-full">
+                        <div class="barrier-box bg-slate-200 text-slate-800 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left cursor-pointer" onclick="focusBowtieBarrier('${causeRefId}', 'preventive', ${idx})"><span class=\"eff-dot ${effClass}\" title=\"Efectividad: ${effLabel}\"></span>${b.text}</div>
                         <div class="barrier-line preventive-barrier-line ml-1"></div>
-                    </div>`
-                ).join('<div class="h-1"></div>') : '<div class="text-xs text-sky-200 italic text-center w-full">Sin barreras</div>';
+                    </div>`;
+                }).join('<div class="h-1"></div>') : '<div class="text-xs text-sky-200 italic text-center w-full">Sin barreras</div>';
                 causeDiagramItem.innerHTML = `
                     <div class="cause-box bg-sky-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-1 cursor-pointer" onclick="focusBowtieGroup('${causeRefId}')">${causeName}</div>
                     <div class="preventive-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-2 items-stretch">
@@ -768,16 +799,22 @@
             document.querySelectorAll('.impact-input-group').forEach(group => {
                 const impactName = group.querySelector('.impact-name-input').value || "Consecuencia";
                 const impactRefId = group.id;
-                const mitigativeBarriers = Array.from(group.querySelectorAll('.mitigative-barrier-input'))
-                                               .map(input => input.value).filter(value => value.trim() !== "");
+                const mitigativeItems = Array.from(group.querySelectorAll('.barrier-input-item'));
+                const mitigativeBarriers = mitigativeItems.map(it => {
+                    const txt = (it.querySelector('.mitigative-barrier-input')?.value || '').trim();
+                    const eff = it.querySelector('.barrier-effectiveness')?.value || 'medium';
+                    return { text: txt, eff };
+                }).filter(b => b.text !== "");
                 const impactDiagramItem = document.createElement('div');
                 impactDiagramItem.className = 'impact-item flex flex-col md:flex-row items-center justify-end w-full p-1 gap-1 md:gap-2';
-                let barriersHTML = mitigativeBarriers.length > 0 ? mitigativeBarriers.map((barrier, idx) => 
-                    `<div class="flex items-center justify-start w-full">
+                let barriersHTML = mitigativeBarriers.length > 0 ? mitigativeBarriers.map((b, idx) => {
+                    const effClass = b.eff === 'high' ? 'eff-high' : (b.eff === 'low' ? 'eff-low' : 'eff-medium');
+                    const effLabel = b.eff === 'high' ? 'Alta' : (b.eff === 'low' ? 'Baja' : 'Media');
+                    return `<div class="flex items-center justify-start w-full">
                         <div class="barrier-line mitigative-barrier-line mr-1"></div>
-                        <div class="barrier-box bg-slate-200 text-slate-800 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left cursor-pointer" onclick="focusBowtieBarrier('${impactRefId}', 'mitigative', ${idx})">${barrier}</div>
-                    </div>`
-                ).join('<div class="h-1"></div>') : '<div class="text-xs text-rose-200 italic text-center w-full">Sin barreras</div>';
+                        <div class="barrier-box bg-slate-200 text-slate-800 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left cursor-pointer" onclick="focusBowtieBarrier('${impactRefId}', 'mitigative', ${idx})"><span class=\"eff-dot ${effClass}\" title=\"Efectividad: ${effLabel}\"></span>${b.text}</div>
+                    </div>`;
+                }).join('<div class="h-1"></div>') : '<div class="text-xs text-rose-200 italic text-center w-full">Sin barreras</div>';
                 impactDiagramItem.innerHTML = `
                     <div class="mitigative-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-1 items-stretch">
                         ${barriersHTML}
