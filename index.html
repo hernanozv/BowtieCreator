@@ -6,6 +6,7 @@
     <title>Analisis Diagrama BowTie y FTA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
         /* --- NUEVA PALETA DE COLORES CORPORATIVA Y SOBRIA --- */
         body {
@@ -279,7 +280,12 @@
                     </div>
                 </section>
                 <section id="bowtieDiagramVisualization" class="mt-12 p-4 md:p-6 section-card min-h-[400px]">
-                    <h2 class="text-2xl font-semibold mb-6 text-center section-title border-b pb-2">Diagrama Bow-Tie</h2>
+                    <div class="relative mb-6 border-b pb-2">
+                        <h2 class="text-2xl font-semibold text-center section-title">Diagrama Bow-Tie</h2>
+                        <button type="button" data-export-ignore="true" onclick="exportBowtieDiagramImage()" class="action-button action-button-secondary absolute right-0 top-0">
+                            Exportar imagen
+                        </button>
+                    </div>
                     <div id="bowtieDiagram" class="flex flex-col md:flex-row justify-between items-stretch w-full p-2 md:p-4 min-h-[300px] gap-2 md:gap-4">
                         <div id="threatsSide" class="w-full md:w-2/5 flex flex-col items-center p-3 md:p-4 bg-sky-600 rounded-xl text-white diagram-box">
                             <h3 class="text-xl md:text-2xl font-bold mb-4 diagram-section-title">CAUSAS</h3>
@@ -558,6 +564,36 @@
             if (document.getElementById('bowtieDiagramVisualization')) {
                  document.getElementById('bowtieDiagramVisualization').scrollIntoView({ behavior: 'smooth' });
             }
+        }
+        
+        function exportBowtieDiagramImage() {
+            const node = document.getElementById('bowtieDiagramVisualization');
+            if (!node) return;
+
+            const prevBg = node.style.backgroundColor;
+            node.style.backgroundColor = '#ffffff';
+
+            const scale = Math.max(window.devicePixelRatio || 1, 2) * 1.5;
+
+            html2canvas(node, {
+                backgroundColor: '#ffffff',
+                scale,
+                useCORS: true,
+                ignoreElements: (el) => el.dataset && el.dataset.exportIgnore === 'true'
+            }).then(canvas => {
+                const link = document.createElement('a');
+                const eventName = (document.getElementById('riskEvent')?.value || 'bowtie').trim()
+                    .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+                link.download = `${eventName || 'bowtie'}_diagram.png`;
+                canvas.toBlob((blob) => {
+                    if (!blob) return;
+                    link.href = URL.createObjectURL(blob);
+                    link.click();
+                    setTimeout(() => URL.revokeObjectURL(link.href), 2000);
+                });
+            }).finally(() => {
+                node.style.backgroundColor = prevBg || '';
+            });
         }
         
         function addFtaChildElement(parentInputsFieldId) {
