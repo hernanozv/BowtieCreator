@@ -794,12 +794,12 @@
                     const effClass = b.eff === 'high' ? 'eff-high' : (b.eff === 'low' ? 'eff-low' : 'eff-medium');
                     const effLabel = b.eff === 'high' ? 'Alta' : (b.eff === 'low' ? 'Baja' : 'Media');
                     return `<div class="flex items-center justify-end w-full">
-                        <div class="barrier-box bg-sky-50 text-sky-900 border border-sky-200 hover:bg-sky-100 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left cursor-pointer" onclick="focusBowtieBarrier('${causeRefId}', 'preventive', ${idx})"><span class=\"eff-dot ${effClass}\" title=\"Efectividad: ${effLabel}\"></span>${b.text}</div>
+                        <div class="barrier-box bg-sky-50 text-sky-900 border border-sky-200 hover:bg-sky-100 p-1.5 rounded-md text-xs shadow-sm diagram-box flex-1 text-left cursor-pointer transition transform duration-150 ease-out hover:shadow-sm hover:-translate-y-px hover:ring-1 hover:ring-sky-200" onclick="focusBowtieBarrier('${causeRefId}', 'preventive', ${idx})"><span class=\"eff-dot ${effClass}\" title=\"Efectividad: ${effLabel}\"></span>${b.text}</div>
                         <div class="barrier-line preventive-barrier-line ml-1"></div>
                     </div>`;
                 }).join('<div class="h-1"></div>') : '<div class="text-xs text-sky-200 italic text-center w-full">Sin barreras</div>';
                 causeDiagramItem.innerHTML = `
-                    <div class="cause-box bg-sky-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-1 cursor-pointer" onclick="focusBowtieGroup('${causeRefId}')">${causeName}</div>
+                    <div class="cause-box bg-sky-400 p-2 rounded-lg shadow-sm text-center diagram-box w-full md:w-1/2 order-1 cursor-pointer transition duration-150 ease-out transform hover:shadow-sm hover:-translate-y-px" onclick="focusBowtieGroup('${causeRefId}')">${causeName}</div>
                     <div class="preventive-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-2 items-stretch">
                         ${barriersHTML}
                     </div>`;
@@ -822,14 +822,14 @@
                     const effLabel = b.eff === 'high' ? 'Alta' : (b.eff === 'low' ? 'Baja' : 'Media');
                     return `<div class="flex items-center justify-start w-full">
                         <div class="barrier-line mitigative-barrier-line mr-1"></div>
-                        <div class="barrier-box bg-rose-50 text-rose-900 border border-rose-200 hover:bg-rose-100 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left cursor-pointer" onclick="focusBowtieBarrier('${impactRefId}', 'mitigative', ${idx})"><span class=\"eff-dot ${effClass}\" title=\"Efectividad: ${effLabel}\"></span>${b.text}</div>
+                        <div class="barrier-box bg-rose-50 text-rose-900 border border-rose-200 hover:bg-rose-100 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left cursor-pointer transition transform duration-150 ease-out hover:shadow-sm hover:-translate-y-px hover:ring-1 hover:ring-rose-200" onclick="focusBowtieBarrier('${impactRefId}', 'mitigative', ${idx})"><span class=\"eff-dot ${effClass}\" title=\"Efectividad: ${effLabel}\"></span>${b.text}</div>
                     </div>`;
                 }).join('<div class="h-1"></div>') : '<div class="text-xs text-rose-200 italic text-center w-full">Sin barreras</div>';
                 impactDiagramItem.innerHTML = `
                     <div class="mitigative-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-1 items-stretch">
                         ${barriersHTML}
                     </div>
-                    <div class="impact-box bg-rose-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-2 cursor-pointer" onclick="focusBowtieGroup('${impactRefId}')">${impactName}</div>`;
+                    <div class="impact-box bg-rose-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-2 cursor-pointer transition duration-150 ease-out transform hover:shadow-md hover:-translate-y-px" onclick="focusBowtieGroup('${impactRefId}')">${impactName}</div>`;
                 impactsContainerDiagram.appendChild(impactDiagramItem);
             });
             if (scrollIntoView && document.getElementById('bowtieDiagramVisualization')) {
