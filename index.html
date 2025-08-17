@@ -171,6 +171,11 @@
         .prob-posible { background-color: #ffe08a; }    /* amarillo suave */
         .prob-probable { background-color: #ffb482; }   /* naranja suave */
         .prob-altamente { background-color: #f28c8c; }  /* rojo suave */
+        /* Indicador de impacto cualitativo de consecuencias (heatmap suave) */
+        .impact-minor { background-color: #b7e4c7; }
+        .impact-moderate { background-color: #ffe08a; }
+        .impact-high { background-color: #ffb482; }
+        .impact-catastrophic { background-color: #f28c8c; }
         /* Slider moderno para probabilidad de causa */
         .cause-probability-slider { 
             -webkit-appearance: none; 
@@ -829,6 +834,42 @@
             setTimeout(() => resumeGroupDnD(slider), 0);
         }
 
+        // --- Impacto (Consecuencias) ---
+        function updateImpactSeveritySlider(sliderEl) {
+            const group = sliderEl.closest('.impact-input-group');
+            if (!group) return;
+            const hidden = group.querySelector('.impact-severity');
+            const badge = group.querySelector('.impact-severity-badge');
+            const val = parseInt(sliderEl.value, 10) || 2;
+            let key = 'moderado';
+            let label = 'Moderado';
+            if (val === 1) { key = 'menor'; label = 'Menor'; }
+            else if (val === 2) { key = 'moderado'; label = 'Moderado'; }
+            else if (val === 3) { key = 'alto'; label = 'Alto'; }
+            else if (val === 4) { key = 'catastrofico'; label = 'Catastrófico'; }
+            if (hidden) hidden.value = key;
+            if (badge) {
+                const base = 'text-xs font-medium px-2 py-0.5 rounded-md impact-severity-badge self-center translate-y-[1px] ';
+                const color = key === 'menor' ? 'bg-green-100 text-green-700' :
+                              key === 'moderado' ? 'bg-amber-100 text-amber-700' :
+                              key === 'alto' ? 'bg-orange-100 text-orange-700' :
+                              'bg-red-100 text-red-700';
+                badge.className = base + color;
+                badge.textContent = label;
+            }
+            if (typeof debouncedRenderBowTie === 'function') debouncedRenderBowTie();
+        }
+        function setImpactSeverityFromLabel(labelEl, value) {
+            const group = labelEl.closest('.impact-input-group');
+            if (!group) return;
+            const slider = group.querySelector('.cause-probability-slider');
+            if (!slider) return;
+            pauseGroupDnD(slider);
+            try { slider.value = value; } catch(_) {}
+            updateImpactSeveritySlider(slider);
+            setTimeout(() => resumeGroupDnD(slider), 0);
+        }
+
         // Desactivar/activar DnD del grupo mientras se usa el slider para evitar arrastre de la card
         function pauseGroupDnD(el) {
             const grp = el && el.closest && el.closest('.cause-input-group, .impact-input-group');
@@ -966,6 +1007,22 @@
                     </button>
                 </div>
                 <input type="text" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 impact-name-input" placeholder="Nombre de la Consecuencia">
+                <div class="mt-2">
+                    <label class="text-sm font-medium text-gray-600">Impacto:</label>
+                    <div class="mt-1 flex items-center gap-3">
+                        <div class="w-96 md:w-[28rem]">
+                            <input type="range" min="1" max="4" step="1" value="2" class="cause-probability-slider" draggable="false" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" onpointercancel="resumeGroupDnD(this)" onmousedown="pauseGroupDnD(this); event.stopPropagation()" onmouseup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)" ondragstart="event.preventDefault();event.stopPropagation();" oninput="updateImpactSeveritySlider(this)">
+                            <div class="relative mt-1 h-4 text-[11px] text-gray-600 select-none prob-slider-pad">
+                                <span class="absolute left-[0%] cause-prob-label" onclick="setImpactSeverityFromLabel(this, 1)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">Menor</span>
+                                <span class="absolute left-[33.333%] -translate-x-1/2 transform cause-prob-label w-24 text-center" onclick="setImpactSeverityFromLabel(this, 2)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">Moderado</span>
+                                <span class="absolute left-[66.666%] -translate-x-1/2 transform cause-prob-label w-24 text-center" onclick="setImpactSeverityFromLabel(this, 3)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">Alto</span>
+                                <span class="absolute left-[100%] translate-x-[-100%] transform cause-prob-label" onclick="setImpactSeverityFromLabel(this, 4)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">Catastrófico</span>
+                            </div>
+                        </div>
+                        <span class="text-xs font-medium px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 impact-severity-badge self-center translate-y-[1px]">Moderado</span>
+                    </div>
+                    <input type="hidden" class="impact-severity" value="moderado">
+                </div>
                 <div class="mt-3">
                     <h4 class="text-sm font-medium text-gray-600 mb-1">Barreras Mitigantes:</h4>
                     <div class="mitigative-barriers-container space-y-2"></div>
@@ -981,6 +1038,9 @@
             // foco automático en el nombre de la consecuencia
             const nameInput = div.querySelector('.impact-name-input');
             if (nameInput) { try { nameInput.focus(); nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {} }
+            // inicializar badge/hidden con el valor del slider
+            const sliderEl = div.querySelector('.cause-probability-slider');
+            if (sliderEl) { try { updateImpactSeveritySlider(sliderEl); } catch(_) {} }
             return div;
         }
 
@@ -1074,6 +1134,7 @@
             document.querySelectorAll('.impact-input-group').forEach(group => {
                 const impactName = group.querySelector('.impact-name-input').value || "Consecuencia";
                 const impactRefId = group.id;
+                const impactSeverity = (group.querySelector('.impact-severity')?.value) || 'moderado';
                 const mitigativeItems = Array.from(group.querySelectorAll('.barrier-input-item'));
                 const mitigativeBarriers = mitigativeItems.map(it => {
                     const txt = (it.querySelector('.mitigative-barrier-input')?.value || '').trim();
@@ -1090,6 +1151,8 @@
                         <div class="barrier-box bg-rose-50 text-rose-900 border border-rose-200 hover:bg-rose-100 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left cursor-pointer transition transform duration-150 ease-out hover:shadow-sm hover:-translate-y-px hover:ring-1 hover:ring-rose-200" onclick="focusBowtieBarrier('${impactRefId}', 'mitigative', ${idx})"><span class=\"eff-dot ${effClass}\" title=\"Efectividad: ${effLabel}\"></span>${b.text}</div>
                     </div>`;
                 }).join('<div class="h-1"></div>') : '<div class="text-xs text-rose-200 italic text-center w-full">Sin barreras</div>';
+                const sevClass = impactSeverity === 'menor' ? 'impact-minor' : (impactSeverity === 'alto' ? 'impact-high' : (impactSeverity === 'catastrofico' ? 'impact-catastrophic' : 'impact-moderate'));
+                const sevLabel = impactSeverity === 'menor' ? 'Menor' : (impactSeverity === 'alto' ? 'Alto' : (impactSeverity === 'catastrofico' ? 'Catastrófico' : 'Moderado'));
                 impactDiagramItem.innerHTML = `
                     <div class="mitigative-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-1 items-stretch">
                         ${barriersHTML}
@@ -1100,7 +1163,7 @@
                             <polygon points="36,2 46,6 36,10" fill="#ffffff" fill-opacity="0.95"></polygon>
                         </svg>
                     </div>
-                    <div class="impact-box bg-rose-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-3 cursor-pointer transition duration-150 ease-out transform hover:shadow-md hover:-translate-y-px" onclick="focusBowtieGroup('${impactRefId}')">${impactName}</div>`;
+                    <div class="impact-box bg-rose-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-3 cursor-pointer transition duration-150 ease-out transform hover:shadow-md hover:-translate-y-px" onclick="focusBowtieGroup('${impactRefId}')"><span class=\"eff-dot ${sevClass}\" title=\"Impacto: ${sevLabel}\"></span>${impactName}</div>`;
                 impactsContainerDiagram.appendChild(impactDiagramItem);
             });
             if (scrollIntoView && document.getElementById('bowtieDiagramVisualization')) {
