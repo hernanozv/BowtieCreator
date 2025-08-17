@@ -166,6 +166,75 @@
         .eff-high { background-color: #16a34a; }   /* verde */
         .eff-medium { background-color: #f59e0b; } /* ámbar */
         .eff-low { background-color: #dc2626; }    /* rojo */
+        /* Indicador de probabilidad cualitativa de causas (reusa tamaño/halo de .eff-dot) */
+        .prob-improbable { background-color: #6b7280; } /* gris */
+        .prob-posible { background-color: #16a34a; }    /* verde */
+        .prob-probable { background-color: #f59e0b; }   /* ámbar */
+        .prob-altamente { background-color: #dc2626; }  /* rojo */
+        /* Slider moderno para probabilidad de causa */
+        .cause-probability-slider { 
+            -webkit-appearance: none; 
+            appearance: none; 
+            height: 6px; 
+            width: calc(100% - 18px); /* restar diámetro del pulgar para alinear el centro */
+            margin-left: 9px; /* mitad del pulgar */
+            margin-right: 9px; /* mitad del pulgar */
+            /* Fondo de la pista + ticks visibles en 0%, 33.333%, 66.666% y 100% */
+            background-image:
+              linear-gradient(#374151,#374151), /* tick 0% */
+              linear-gradient(#374151,#374151), /* tick 33.333% */
+              linear-gradient(#374151,#374151), /* tick 66.666% */
+              linear-gradient(#374151,#374151), /* tick 100% */
+              linear-gradient(90deg, #9ca3af 0%, #16a34a 33%, #f59e0b 66%, #dc2626 100%); /* pista */
+            background-repeat: no-repeat;
+            background-size:
+              2px 8px, /* 0% */
+              2px 8px, /* 33.333% */
+              2px 8px, /* 66.666% */
+              2px 8px, /* 100% */
+              100% 6px; /* pista */
+            background-position:
+              0% 50%,
+              33.333% 50%,
+              66.666% 50%,
+              100% 50%,
+              0% 50%;
+            border-radius: 9999px; 
+            outline: none; 
+            cursor: pointer;
+            touch-action: none; /* evita gestos que interfieren y mejora arrastre en touch */
+        }
+        .cause-probability-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; 
+            appearance: none;
+            width: 18px; 
+            height: 18px; 
+            background: #ffffff; 
+            border: 2px solid #374151; 
+            border-radius: 9999px; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+            cursor: grab;
+        }
+        .cause-probability-slider:active::-webkit-slider-thumb { cursor: grabbing; }
+        .cause-probability-slider::-moz-range-thumb {
+            width: 18px; 
+            height: 18px; 
+            background: #ffffff; 
+            border: 2px solid #374151; 
+            border-radius: 9999px; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+            cursor: grab;
+        }
+        .cause-probability-slider:active::-moz-range-thumb { cursor: grabbing; }
+        .cause-probability-slider::-moz-range-track { 
+            height: 6px; 
+            background: linear-gradient(90deg, #9ca3af 0%, #16a34a 33%, #f59e0b 66%, #dc2626 100%);
+            border-radius: 9999px; 
+        }
+        /* Padding igual a la mitad del pulgar (18px/2=9px) para alinear labels con el centro del pulgar */
+        .prob-slider-pad { padding-left: 9px; padding-right: 9px; }
+        /* Labels clicables para ajustar el slider */
+        .cause-prob-label { cursor: pointer; }
         /* Placeholder visual para DnD de barreras */
         .barrier-placeholder {
             border: 2px dashed #9ca3af;
@@ -556,6 +625,7 @@
 
         // --- Reordenación por arrastrar y soltar (HTML5 DnD) ---
         let bowtieDrag = { el: null, type: null, placeholder: null, container: null };
+        let suppressDnd = false; // desactiva DnD temporalmente al interactuar con controles (ej. slider)
         let dndIdCounter = 0;
         function getOrAssignDndId(el) {
             if (!el) return '';
@@ -622,6 +692,13 @@
                 }
                 dragStarterEl.draggable = true;
                 dragStarterEl.addEventListener('dragstart', (e) => {
+                    // No iniciar DnD si el origen es un control interactivo (inputs, selects, sliders, botones)
+                    const interactive = e.target && (e.target.closest('input, select, textarea, button, .cause-probability-slider'));
+                    if (interactive || suppressDnd) {
+                        try { e.preventDefault(); } catch(_) {}
+                        try { e.stopPropagation(); } catch(_) {}
+                        return;
+                    }
                     bowtieDrag.el = item;
                     bowtieDrag.type = dndType;
                     bowtieDrag.container = containerEl;
@@ -683,6 +760,24 @@
             });
         }
 
+        // Guardia global: si suppressDnd está activo, cancelar cualquier dragstart
+        document.addEventListener('dragstart', (e) => {
+            if (suppressDnd) {
+                try { e.preventDefault(); } catch(_) {}
+                try { e.stopPropagation(); } catch(_) {}
+            }
+        }, true);
+        // Reanudar DnD globalmente cuando finaliza la interacción de puntero
+        function globalResumeDnd() {
+            suppressDnd = false;
+            try {
+                document.querySelectorAll('.cause-input-group, .impact-input-group').forEach(el => { el.draggable = true; });
+            } catch(_) {}
+        }
+        document.addEventListener('pointerup', globalResumeDnd, true);
+        document.addEventListener('mouseup', globalResumeDnd, true);
+        document.addEventListener('touchend', globalResumeDnd, { capture: true, passive: true });
+
         function validatePercentageInput(inputElement) {
             let value = parseInt(inputElement.value);
             if (isNaN(value) && inputElement.value !== "") { 
@@ -695,6 +790,55 @@
             if (inputElement.value !== "" && !isNaN(value)) {
                  inputElement.value = value; 
             }
+        }
+
+        function updateCauseProbabilitySlider(sliderEl) {
+            const group = sliderEl.closest('.cause-input-group');
+            if (!group) return;
+            const hidden = group.querySelector('.cause-probability');
+            const badge = group.querySelector('.cause-probability-badge');
+            const val = parseInt(sliderEl.value, 10) || 2;
+            let key = 'posible';
+            let label = 'Posible';
+            if (val === 1) { key = 'improbable'; label = 'Improbable'; }
+            else if (val === 2) { key = 'posible'; label = 'Posible'; }
+            else if (val === 3) { key = 'probable'; label = 'Probable'; }
+            else if (val === 4) { key = 'altamente'; label = 'Altamente probable'; }
+            if (hidden) hidden.value = key;
+            if (badge) {
+                const base = 'text-xs font-medium px-2 py-0.5 rounded-md cause-probability-badge ';
+                const color = key === 'improbable' ? 'bg-gray-100 text-gray-700' :
+                              key === 'posible' ? 'bg-green-100 text-green-700' :
+                              key === 'probable' ? 'bg-amber-100 text-amber-700' :
+                              'bg-red-100 text-red-700';
+                badge.className = base + color;
+                badge.textContent = label;
+            }
+            if (typeof debouncedRenderBowTie === 'function') debouncedRenderBowTie();
+        }
+
+        function setCauseProbabilityFromLabel(labelEl, value) {
+            const group = labelEl.closest('.cause-input-group');
+            if (!group) return;
+            const slider = group.querySelector('.cause-probability-slider');
+            if (!slider) return;
+            pauseGroupDnD(slider);
+            try { slider.value = value; } catch(_) {}
+            updateCauseProbabilitySlider(slider);
+            // pequeña demora para reanudar tras click/touch
+            setTimeout(() => resumeGroupDnD(slider), 0);
+        }
+
+        // Desactivar/activar DnD del grupo mientras se usa el slider para evitar arrastre de la card
+        function pauseGroupDnD(el) {
+            const grp = el && el.closest && el.closest('.cause-input-group, .impact-input-group');
+            suppressDnd = true;
+            if (grp) grp.draggable = false;
+        }
+        function resumeGroupDnD(el) {
+            const grp = el && el.closest && el.closest('.cause-input-group, .impact-input-group');
+            suppressDnd = false;
+            if (grp) grp.draggable = true;
         }
 
 
@@ -712,11 +856,27 @@
                     <label class="block text-md font-medium text-gray-700">Causa ${causeCounter}:</label>
                     <button onclick="${removeElementHandler}" class="inline-flex items-center justify-center p-1 text-red-500 hover:text-red-700" aria-label="Eliminar causa" title="Eliminar causa">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 100 2h.293l.853 10.24A2 2 0 007.138 18h5.724a2 2 0 001.992-1.76L15.707 6H16a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0010 2H9zm-1 6a1 1 0 112 0v7a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v7a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 100 2h.293l.853 10.24A2 2 0 007.138 18h5.724a2 2 0 001.992-1.76L15.707 6H16a 1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0010 2H9zm-1 6a1 1 0 112 0v7a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v7a1 1 0 11-2 0V8z" clip-rule="evenodd" />
                         </svg>
                     </button>
                 </div>
                 <input type="text" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 cause-name-input" placeholder="Nombre de la causa">
+                <div class="mt-2">
+                    <label class="text-sm font-medium text-gray-600">Probabilidad:</label>
+                    <div class="mt-1 flex items-center gap-3">
+                        <div class="w-96 md:w-[28rem]">
+                            <input type="range" min="1" max="4" step="1" value="2" class="cause-probability-slider" draggable="false" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" onpointercancel="resumeGroupDnD(this)" onmousedown="pauseGroupDnD(this); event.stopPropagation()" onmouseup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)" ondragstart="event.preventDefault();event.stopPropagation();" oninput="updateCauseProbabilitySlider(this)">
+                            <div class="relative mt-1 h-4 text-[11px] text-gray-500 select-none prob-slider-pad">
+                                <span class="absolute left-[0%] cause-prob-label" onclick="setCauseProbabilityFromLabel(this, 1)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">Improbable</span>
+                                <span class="absolute left-[33.333%] -translate-x-1/2 transform cause-prob-label" onclick="setCauseProbabilityFromLabel(this, 2)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">Posible</span>
+                                <span class="absolute left-[66.666%] -translate-x-1/2 transform cause-prob-label" onclick="setCauseProbabilityFromLabel(this, 3)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">Probable</span>
+                                <span class="absolute left-[100%] translate-x-[-100%] transform cause-prob-label" onclick="setCauseProbabilityFromLabel(this, 4)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">Altamente probable</span>
+                            </div>
+                        </div>
+                        <span class="text-xs font-medium px-2 py-0.5 rounded-md bg-green-100 text-green-700 cause-probability-badge">Posible</span>
+                    </div>
+                    <input type="hidden" class="cause-probability" value="posible">
+                </div>
                 <div class="mt-3">
                     <h4 class="text-sm font-medium text-gray-600 mb-1">Barreras Preventivas:</h4>
                     <div class="preventive-barriers-container space-y-2"></div>
@@ -732,6 +892,9 @@
             // foco automático en el nombre de la causa
             const nameInput = div.querySelector('.cause-name-input');
             if (nameInput) { try { nameInput.focus(); nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {} }
+            // inicializar badge/hidden con el valor del slider
+            const sliderEl = div.querySelector('.cause-probability-slider');
+            if (sliderEl) { try { updateCauseProbabilitySlider(sliderEl); } catch(_) {} }
             return div;
         }
 
@@ -863,6 +1026,7 @@
             document.querySelectorAll('.cause-input-group').forEach(group => {
                 const causeName = group.querySelector('.cause-name-input').value || "Causa";
                 const causeRefId = group.id;
+                const causeProb = (group.querySelector('.cause-probability')?.value) || 'posible';
                 const preventiveItems = Array.from(group.querySelectorAll('.barrier-input-item'));
                 const preventiveBarriers = preventiveItems.map(it => {
                     const txt = (it.querySelector('.preventive-barrier-input')?.value || '').trim();
@@ -879,8 +1043,10 @@
                         <div class="barrier-line preventive-barrier-line ml-1"></div>
                     </div>`;
                 }).join('<div class="h-1"></div>') : '<div class="text-xs text-sky-200 italic text-center w-full">Sin barreras</div>';
+                const probClass = (causeProb === 'improbable') ? 'prob-improbable' : (causeProb === 'probable') ? 'prob-probable' : (causeProb === 'altamente') ? 'prob-altamente' : 'prob-posible';
+                const probLabel = (causeProb === 'improbable') ? 'Improbable' : (causeProb === 'probable') ? 'Probable' : (causeProb === 'altamente') ? 'Altamente probable' : 'Posible';
                 causeDiagramItem.innerHTML = `
-                    <div class="cause-box bg-sky-400 p-2 rounded-lg shadow-sm text-center diagram-box w-full md:w-1/2 order-1 cursor-pointer transition duration-150 ease-out transform hover:shadow-sm hover:-translate-y-px" onclick="focusBowtieGroup('${causeRefId}')">${causeName}</div>
+                    <div class="cause-box bg-sky-400 p-2 rounded-lg shadow-sm text-center diagram-box w-full md:w-1/2 order-1 cursor-pointer transition duration-150 ease-out transform hover:shadow-sm hover:-translate-y-px" onclick="focusBowtieGroup('${causeRefId}')"><span class=\"eff-dot ${probClass}\" title=\"Probabilidad: ${probLabel}\"></span>${causeName}</div>
                     <div class="preventive-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-2 items-stretch">
                         ${barriersHTML}
                     </div>
@@ -1478,13 +1644,27 @@
             let data = [[ "EventoRiesgo", riskEvent ]];
             document.querySelectorAll('.cause-input-group').forEach(group => {
                 const causeName = group.querySelector('.cause-name-input').value;
-                const barriers = Array.from(group.querySelectorAll('.preventive-barrier-input')).map(input => input.value);
+                // Exportar cada barrera como "texto [eff=high|medium|low]" (preservar orden actual)
+                const items = Array.from(group.querySelectorAll('.barrier-input-item'));
+                const barriers = items.map(it => {
+                    const txt = (it.querySelector('.preventive-barrier-input')?.value || '').trim();
+                    if (!txt) return '';
+                    const eff = (it.querySelector('.barrier-effectiveness')?.value || 'medium');
+                    return `${txt} [eff=${eff}]`;
+                });
                 data.push(["Causa", causeName || "Causa sin nombre", ...barriers]);
             });
             data.push([]); 
             document.querySelectorAll('.impact-input-group').forEach(group => {
                 const impactName = group.querySelector('.impact-name-input').value;
-                const barriers = Array.from(group.querySelectorAll('.mitigative-barrier-input')).map(input => input.value);
+                // Exportar cada barrera como "texto [eff=high|medium|low]" (preservar orden actual)
+                const items = Array.from(group.querySelectorAll('.barrier-input-item'));
+                const barriers = items.map(it => {
+                    const txt = (it.querySelector('.mitigative-barrier-input')?.value || '').trim();
+                    if (!txt) return '';
+                    const eff = (it.querySelector('.barrier-effectiveness')?.value || 'medium');
+                    return `${txt} [eff=${eff}]`;
+                });
                 data.push(["Consecuencia", impactName || "Consecuencia sin nombre", ...barriers]);
             });
             const worksheet = XLSX.utils.aoa_to_sheet(data);
@@ -1499,6 +1679,18 @@
             if (eventRow && eventRow.length > 1) {
                 document.getElementById('riskEvent').value = eventRow[1];
             }
+            // Helper: parsear celda de barrera con posible sufijo de efectividad
+            const parseBarrierCell = (cell) => {
+                const s = String(cell).trim();
+                const m = s.match(/\[eff=(high|medium|low)\]$/i);
+                if (m) {
+                    return {
+                        text: s.replace(/\s*\[eff=(high|medium|low)\]\s*$/i, '').trim(),
+                        eff: m[1].toLowerCase()
+                    };
+                }
+                return { text: s, eff: 'medium' }; // compatibilidad hacia atrás
+            };
             jsonData.forEach(row => {
                 if (row.length < 2) return;
                 const elementType = row[0];
@@ -1510,8 +1702,13 @@
                         causeDiv.querySelector('.cause-name-input').value = elementName;
                         const causeId = causeDiv.id;
                         barriers.forEach(barrierDesc => {
+                            const meta = parseBarrierCell(barrierDesc);
                             const barrierInput = addPreventiveBarrierInput(causeId);
-                            if (barrierInput) barrierInput.value = barrierDesc;
+                            if (barrierInput) {
+                                barrierInput.value = meta.text;
+                                const effSelect = barrierInput.parentElement?.querySelector('.barrier-effectiveness');
+                                if (effSelect) effSelect.value = meta.eff;
+                            }
                         });
                     }
                 } else if (elementType === "Consecuencia") {
@@ -1520,8 +1717,13 @@
                         impactDiv.querySelector('.impact-name-input').value = elementName;
                         const impactId = impactDiv.id;
                         barriers.forEach(barrierDesc => {
+                            const meta = parseBarrierCell(barrierDesc);
                             const barrierInput = addMitigativeBarrierInput(impactId);
-                            if(barrierInput) barrierInput.value = barrierDesc;
+                            if (barrierInput) {
+                                barrierInput.value = meta.text;
+                                const effSelect = barrierInput.parentElement?.querySelector('.barrier-effectiveness');
+                                if (effSelect) effSelect.value = meta.eff;
+                            }
                         });
                     }
                 }
