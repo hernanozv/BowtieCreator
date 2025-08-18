@@ -260,6 +260,15 @@
         .prob-slider-pad { padding-left: 9px; padding-right: 9px; }
         /* Labels clicables para ajustar el slider */
         .cause-prob-label { cursor: pointer; }
+        /* Swatches para leyendas de colores (probabilidad/impacto) */
+        .legend-swatch {
+            display: inline-block;
+            width: 14px;
+            height: 10px;
+            border-radius: 2px;
+            margin-right: 6px;
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.08) inset;
+        }
         /* Placeholder visual para DnD de barreras */
         .barrier-placeholder {
             border: 2px dashed #9ca3af;
@@ -474,7 +483,6 @@
                                 + Añadir Consecuencia
                             </button>
                         </div>
-                    </div>
                 </section>
                 <section id="bowtieDiagramVisualization" class="mt-12 p-4 md:p-6 section-card min-h-[400px]">
                     <div class="grid grid-cols-3 items-center mb-6 border-b pb-2">
@@ -504,6 +512,23 @@
                         <div id="consequencesSide" class="w-full md:w-2/5 flex flex-col items-center p-3 md:p-4 bg-rose-600 rounded-xl text-white diagram-box">
                             <h3 class="text-xl md:text-2xl font-bold mb-4 diagram-section-title">CONSECUENCIAS</h3>
                             <div id="impactsContainerForDiagram" class="space-y-2 w-full flex flex-col items-center"></div>
+                        </div>
+                    </div>
+                    <!-- Leyendas de Probabilidad e Impacto (debajo del diagrama) -->
+                    <div class="flex flex-col md:flex-row items-start justify-between text-xs text-gray-600 mt-4 gap-3" aria-label="Referencias de colores de probabilidad e impacto" data-export-ignore="true">
+                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <span class="mr-1 font-medium text-gray-700">Probabilidad:</span>
+                            <span class="flex items-center"><span class="legend-swatch prob-improbable" aria-hidden="true"></span>Improbable</span>
+                            <span class="flex items-center"><span class="legend-swatch prob-posible" aria-hidden="true"></span>Posible</span>
+                            <span class="flex items-center"><span class="legend-swatch prob-probable" aria-hidden="true"></span>Probable</span>
+                            <span class="flex items-center"><span class="legend-swatch prob-altamente" aria-hidden="true"></span>Altamente probable</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <span class="mr-1 font-medium text-gray-700">Impacto:</span>
+                            <span class="flex items-center"><span class="legend-swatch impact-minor" aria-hidden="true"></span>Menor</span>
+                            <span class="flex items-center"><span class="legend-swatch impact-moderate" aria-hidden="true"></span>Moderado</span>
+                            <span class="flex items-center"><span class="legend-swatch impact-high" aria-hidden="true"></span>Alto</span>
+                            <span class="flex items-center"><span class="legend-swatch impact-catastrophic" aria-hidden="true"></span>Catastrófico</span>
                         </div>
                     </div>
                 </section>
@@ -1138,7 +1163,7 @@
                 const probClass = (causeProb === 'improbable') ? 'prob-improbable' : (causeProb === 'probable') ? 'prob-probable' : (causeProb === 'altamente') ? 'prob-altamente' : 'prob-posible';
                 const probLabel = (causeProb === 'improbable') ? 'Improbable' : (causeProb === 'probable') ? 'Probable' : (causeProb === 'altamente') ? 'Altamente probable' : 'Posible';
                 causeDiagramItem.innerHTML = `
-                    <div class="cause-box bg-sky-400 p-2 rounded-lg shadow-sm text-center diagram-box w-full md:w-1/2 order-1 cursor-pointer transition duration-150 ease-out transform hover:shadow-sm hover:-translate-y-px indicator-left ${probClass}" title="Probabilidad: ${probLabel}" onclick="focusBowtieGroup('${causeRefId}')">${causeName}</div>
+                    <div class="cause-box bg-slate-50 border border-slate-300 text-slate-900 p-2 rounded-lg shadow-sm text-center diagram-box w-full md:w-1/2 order-1 cursor-pointer transition duration-150 ease-out transform hover:shadow-sm hover:-translate-y-px indicator-left ${probClass}" title="Probabilidad: ${probLabel}" onclick="focusBowtieGroup('${causeRefId}')">${causeName}</div>
                     <div class="preventive-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-2 items-stretch">
                         ${barriersHTML}
                     </div>
@@ -1183,7 +1208,7 @@
                             <polygon points="36,2 46,6 36,10" fill="#ffffff" fill-opacity="0.95"></polygon>
                         </svg>
                     </div>
-                    <div class="impact-box bg-rose-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-3 cursor-pointer transition duration-150 ease-out transform hover:shadow-md hover:-translate-y-px indicator-left ${sevClass}" title="Impacto: ${sevLabel}" onclick="focusBowtieGroup('${impactRefId}')">${impactName}</div>`;
+                    <div class="impact-box bg-slate-50 border border-slate-300 text-slate-900 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-3 cursor-pointer transition duration-150 ease-out transform hover:shadow-md hover:-translate-y-px indicator-left ${sevClass}" title="Impacto: ${sevLabel}" onclick="focusBowtieGroup('${impactRefId}')">${impactName}</div>`;
                 impactsContainerDiagram.appendChild(impactDiagramItem);
             });
             if (scrollIntoView && document.getElementById('bowtieDiagramVisualization')) {
