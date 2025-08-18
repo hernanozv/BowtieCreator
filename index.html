@@ -651,6 +651,153 @@
         let causeCounter = 0;
         let impactCounter = 0;
         let ftaNodeCounter = 0;
+        
+        // --- Reutilización de barreras (todas compartidas por defecto, efectividad por ocurrencia) ---
+        const barrierRegistryAll = new Map();
+        let barrierIdCounterAll = 0;
+
+        function createBarrierId() { return `b-${++barrierIdCounterAll}`; }
+        function registerBarrier(text, eff) {
+            const id = createBarrierId();
+            barrierRegistryAll.set(id, { id, text: (text || ''), eff: (eff || 'medium') });
+            return id;
+        }
+        function getBarrierListAll() { return Array.from(barrierRegistryAll.values()); }
+        function linkBarrierToItem(inputEl, barrierId, effOverride) {
+            if (!inputEl) return;
+            inputEl.dataset.barrierId = barrierId;
+            const reg = barrierRegistryAll.get(barrierId);
+            if (reg && typeof reg.text === 'string') inputEl.value = reg.text;
+            // Copiar efectividad por defecto de la barrera vinculada a ESTA ocurrencia (sin propagar cambios futuros)
+            const groupItem = inputEl.closest('.barrier-input-item');
+            const effSelect = groupItem && groupItem.querySelector('.barrier-effectiveness');
+            const effVal = (typeof effOverride === 'string' && effOverride) ? effOverride : (reg && reg.eff);
+            if (effSelect && effVal) {
+                try { effSelect.value = effVal; } catch(_) {}
+            }
+            propagateBarrierText(barrierId, inputEl.value);
+        }
+        function unlinkBarrierFromItem(inputEl) { if (inputEl) delete inputEl.dataset.barrierId; }
+        function propagateBarrierText(barrierId, newText) {
+            const reg = barrierRegistryAll.get(barrierId);
+            if (!reg) return;
+            reg.text = newText;
+            document.querySelectorAll('.preventive-barrier-input, .mitigative-barrier-input').forEach(inp => {
+                if (inp.dataset && inp.dataset.barrierId === barrierId && inp.value !== newText) { inp.value = newText; }
+            });
+            if (typeof debouncedRenderBowTie === 'function') debouncedRenderBowTie();
+        }
+        function ensureBarrierIdForInput(inputEl) {
+            if (!inputEl) return null;
+            if (inputEl.dataset && inputEl.dataset.barrierId) return inputEl.dataset.barrierId;
+            const groupItem = inputEl.closest('.barrier-input-item');
+            const effSelect = groupItem && groupItem.querySelector('.barrier-effectiveness');
+            const eff = effSelect ? effSelect.value : 'medium';
+            const id = registerBarrier((inputEl.value || '').trim(), eff);
+            inputEl.dataset.barrierId = id;
+            return id;
+        }
+        function closeAnyOpenBarrierPicker() {
+            document.querySelectorAll('.barrier-picker-dropdown').forEach(p => p.remove());
+            window.removeEventListener('keydown', barrierPickerKeydownHandler);
+            document.removeEventListener('click', barrierPickerOutsideClick, true);
+        }
+        function barrierPickerKeydownHandler(e) { if (e.key === 'Escape') closeAnyOpenBarrierPicker(); }
+        function barrierPickerOutsideClick(e) {
+            const isPicker = e.target.closest && e.target.closest('.barrier-picker-dropdown');
+            const isButton = e.target.closest && e.target.closest('.barrier-picker-button');
+            if (!isPicker && !isButton) closeAnyOpenBarrierPicker();
+        }
+        function getCurrentEffectivenessOfBarrier(barrierId) {
+            const inputs = document.querySelectorAll('.preventive-barrier-input, .mitigative-barrier-input');
+            for (const inp of inputs) {
+                if (inp.dataset && inp.dataset.barrierId === barrierId) {
+                    const item = inp.closest('.barrier-input-item');
+                    const sel = item && item.querySelector('.barrier-effectiveness');
+                    if (sel && sel.value) return sel.value;
+                }
+            }
+            const reg = barrierRegistryAll.get(barrierId);
+            return (reg && reg.eff) ? reg.eff : 'medium';
+        }
+        function openBarrierPicker(btn) {
+            // excluir la barrera actual del listado
+            const groupItem = btn.closest('.barrier-input-item');
+            const inputCurrent = groupItem && (groupItem.querySelector('.preventive-barrier-input') || groupItem.querySelector('.mitigative-barrier-input'));
+            const currentId = inputCurrent && inputCurrent.dataset ? inputCurrent.dataset.barrierId : null;
+            const list = getBarrierListAll().filter(b => (!currentId || b.id !== currentId) && b.text && b.text.trim().length > 0);
+            if (list.length === 0) { alert('No hay otras barreras disponibles para vincular.'); return; }
+            closeAnyOpenBarrierPicker();
+            const r = btn.getBoundingClientRect();
+            const picker = document.createElement('div');
+            picker.className = 'barrier-picker-dropdown';
+            picker.style.position = 'absolute';
+            picker.style.left = `${Math.max(8, r.left + window.scrollX)}px`;
+            picker.style.top = `${r.bottom + window.scrollY + 4}px`;
+            picker.style.zIndex = '9999';
+            picker.style.background = '#fff';
+            picker.style.border = '1px solid #e5e7eb';
+            picker.style.borderRadius = '6px';
+            picker.style.boxShadow = '0 6px 18px rgba(0,0,0,0.12)';
+            picker.style.maxHeight = '240px';
+            picker.style.overflowY = 'auto';
+            picker.style.minWidth = '220px';
+            const ul = document.createElement('div');
+            ul.style.padding = '6px';
+            list.forEach(b => {
+                const effForItem = getCurrentEffectivenessOfBarrier(b.id);
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.textContent = b.text && b.text.trim() ? b.text : `(Sin nombre) ${b.id}`;
+                item.style.display = 'block';
+                item.style.width = '100%';
+                item.style.textAlign = 'left';
+                item.style.padding = '6px 8px';
+                item.style.fontSize = '12px';
+                item.style.borderRadius = '4px';
+                item.style.color = '#111827';
+                item.style.background = 'transparent';
+                item.onmouseenter = () => { item.style.background = '#f3f4f6'; };
+                item.onmouseleave = () => { item.style.background = 'transparent'; };
+                item.addEventListener('click', () => {
+                    const input = inputCurrent;
+                    if (input) linkBarrierToItem(input, b.id, effForItem);
+                    closeAnyOpenBarrierPicker();
+                });
+                ul.appendChild(item);
+            });
+            picker.appendChild(ul);
+            document.body.appendChild(picker);
+            // cerrar en escape / click externo
+            window.addEventListener('keydown', barrierPickerKeydownHandler);
+            document.addEventListener('click', barrierPickerOutsideClick, true);
+        }
+        // Handlers UI (usar picker)
+        function onLinkPreventiveBarrier(btn) { openBarrierPicker(btn); }
+        function onLinkMitigativeBarrier(btn) { openBarrierPicker(btn); }
+        function onUnlinkBarrier(btn) {
+            const item = btn.closest('.barrier-input-item');
+            if (!item) return;
+            const input = item.querySelector('.preventive-barrier-input, .mitigative-barrier-input');
+            unlinkBarrierFromItem(input);
+        }
+        // Propagación al editar inputs vinculados
+        function handlePreventiveBarrierInput(e) {
+            const t = e.target;
+            if (t && t.classList && t.classList.contains('preventive-barrier-input')) {
+                if (!t.dataset.barrierId) ensureBarrierIdForInput(t);
+                const id = t.dataset && t.dataset.barrierId;
+                if (id) propagateBarrierText(id, t.value);
+            }
+        }
+        function handleMitigativeBarrierInput(e) {
+            const t = e.target;
+            if (t && t.classList && t.classList.contains('mitigative-barrier-input')) {
+                if (!t.dataset.barrierId) ensureBarrierIdForInput(t);
+                const id = t.dataset && t.dataset.barrierId;
+                if (id) propagateBarrierText(id, t.value);
+            }
+        }
 
         // --- Auto-actualización del diagrama BowTie con debounce ---
         function debounce(fn, delay = 300) {
@@ -672,6 +819,9 @@
         // también refrescar cuando cambie la efectividad (select)
         document.getElementById('causesContainer').addEventListener('change', debouncedRenderBowTie, true);
         document.getElementById('impactsContainer').addEventListener('change', debouncedRenderBowTie, true);
+        // Propagar texto de barreras compartidas al editar
+        document.getElementById('causesContainer').addEventListener('input', handlePreventiveBarrierInput, true);
+        document.getElementById('impactsContainer').addEventListener('input', handleMitigativeBarrierInput, true);
 
         // --- Reordenación por arrastrar y soltar (HTML5 DnD) ---
         let bowtieDrag = { el: null, type: null, placeholder: null, container: null };
@@ -1018,6 +1168,14 @@
                     <option value="medium" selected>Media</option>
                     <option value="low">Baja</option>
                 </select>
+                <div class="flex items-center gap-1">
+                    <button type="button" class="p-1 text-sky-700 hover:text-sky-900 barrier-picker-button" title="Vincular barrera existente" aria-label="Vincular barrera existente" onclick="onLinkPreventiveBarrier(this)">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4" aria-hidden="true">
+                            <path d="M13.828 10.172a4 4 0 010 5.656l-2 2a4 4 0 01-5.656-5.656l1.172-1.172a1 1 0 111.414 1.414L7.586 13.586a2 2 0 102.828 2.828l2-2a2 2 0 000-2.828 1 1 0 111.414-1.414z"/>
+                            <path d="M10.172 13.828a4 4 0 010-5.656l2-2a4 4 0 115.656 5.656l-1.172 1.172a1 1 0 11-1.414-1.414l1.172-1.172a2 2 0 10-2.828-2.828l-2 2a2 2 0 000 2.828 1 1 0 11-1.414 1.414z"/>
+                        </svg>
+                    </button>
+                </div>
                 <button onclick="removeElement(this.parentElement)" class="inline-flex items-center justify-center p-1 text-red-500 hover:text-red-700" aria-label="Eliminar barrera" title="Eliminar barrera">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
                         <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 100 2h.293l.853 10.24A2 2 0 007.138 18h5.724a2 2 0 001.992-1.76L15.707 6H16a 1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0010 2H9zm-1 6a1 1 0 112 0v7a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v7a1 1 0 11-2 0V8z" clip-rule="evenodd" />
@@ -1029,6 +1187,8 @@
             // habilitar DnD para barreras preventivas dentro de esta causa
             enableDnDForContainer(barriersContainer, '.barrier-input-item');
             const inputEl = barrierDiv.querySelector('.preventive-barrier-input');
+            // auto-compartir al crear
+            if (inputEl) { ensureBarrierIdForInput(inputEl); }
             if (inputEl) { try { inputEl.focus(); inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {} }
             return inputEl;
         }
@@ -1111,9 +1271,17 @@
                     <option value="medium" selected>Media</option>
                     <option value="low">Baja</option>
                 </select>
+                <div class="flex items-center gap-1">
+                    <button type="button" class="p-1 text-rose-700 hover:text-rose-900 barrier-picker-button" title="Vincular barrera existente" aria-label="Vincular barrera existente" onclick="onLinkMitigativeBarrier(this)">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4" aria-hidden="true">
+                            <path d="M13.828 10.172a4 4 0 010 5.656l-2 2a4 4 0 01-5.656-5.656l1.172-1.172a1 1 0 111.414 1.414L7.586 13.586a2 2 0 102.828 2.828l2-2a2 2 0 000-2.828 1 1 0 111.414-1.414z"/>
+                            <path d="M10.172 13.828a4 4 0 010-5.656l2-2a4 4 0 115.656 5.656l-1.172 1.172a1 1 0 11-1.414-1.414l1.172-1.172a2 2 0 10-2.828-2.828l-2 2a2 2 0 000 2.828 1 1 0 11-1.414 1.414z"/>
+                        </svg>
+                    </button>
+                </div>
                 <button onclick="removeElement(this.parentElement)" class="inline-flex items-center justify-center p-1 text-red-500 hover:text-red-700" aria-label="Eliminar barrera" title="Eliminar barrera">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 100 2h.293l.853 10.24A2 2 0 007.138 18h5.724a2 2 0 001.992-1.76L15.707 6H16a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0010 2H9zm-1 6a1 1 0 112 0v7a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v7a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 100 2h.293l.853 10.24A2 2 0 007.138 18h5.724a2 2 0 001.992-1.76L15.707 6H16a 1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0010 2H9zm-1 6a1 1 0 112 0v7a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v7a1 1 0 11-2 0V8z" clip-rule="evenodd" />
                     </svg>
                 </button>
             `;
@@ -1122,6 +1290,8 @@
             // habilitar DnD para barreras mitigantes dentro de esta consecuencia
             enableDnDForContainer(barriersContainer, '.barrier-input-item');
             const inputEl = barrierDiv.querySelector('.mitigative-barrier-input');
+            // auto-compartir al crear
+            if (inputEl) { ensureBarrierIdForInput(inputEl); }
             if (inputEl) { try { inputEl.focus(); inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {} }
             return inputEl;
         }
