@@ -1020,7 +1020,7 @@
             else if (val === 4) { key = 'altamente'; label = 'Altamente probable'; }
             if (hidden) hidden.value = key;
             if (badge) {
-                const base = 'text-xs font-medium px-2 py-0.5 rounded-md cause-probability-badge self-start mt-[3px] ';
+                const base = 'inline-block text-xs font-medium px-2 py-0.5 rounded-md cause-probability-badge self-start mt-[3px] w-[11rem] text-center whitespace-nowrap ';
                 const color = key === 'improbable' ? 'bg-green-100 text-green-700' :
                               key === 'posible' ? 'bg-amber-100 text-amber-700' :
                               key === 'probable' ? 'bg-orange-100 text-orange-700' :
@@ -1058,7 +1058,7 @@
             else if (val === 4) { key = 'catastrofico'; label = 'Catastrófico'; }
             if (hidden) hidden.value = key;
             if (badge) {
-                const base = 'text-xs font-medium px-2 py-0.5 rounded-md impact-severity-badge self-center translate-y-[1px] ';
+                const base = 'inline-block text-xs font-medium px-2 py-0.5 rounded-md impact-severity-badge self-center translate-y-[1px] w-[9rem] text-center whitespace-nowrap ';
                 const color = key === 'menor' ? 'bg-green-100 text-green-700' :
                               key === 'moderado' ? 'bg-amber-100 text-amber-700' :
                               key === 'alto' ? 'bg-orange-100 text-orange-700' :
@@ -1135,7 +1135,7 @@
                                 </span>
                             </div>
                         </div>
-                        <span class="text-xs font-medium px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 cause-probability-badge self-center translate-y-[1px]">Posible</span>
+                        <span class="inline-block text-xs font-medium px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 cause-probability-badge self-start mt-[3px] w-[11rem] text-center whitespace-nowrap">Posible</span>
                     </div>
                     <input type="hidden" class="cause-probability" value="posible">
                 </div>
@@ -1192,7 +1192,7 @@
                 </div>
                 <button onclick="removeElement(this.parentElement)" class="inline-flex items-center justify-center p-1 text-red-500 hover:text-red-700" aria-label="Eliminar barrera" title="Eliminar barrera">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 100 2h.293l.853 10.24A2 2 0 007.138 18h5.724a2 2 0 001.992-1.76L15.707 6H16a 1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0010 2H9zm-1 6a1 1 0 112 0v7a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v7a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 100 2h.293l.853 10.24A2 2 0 007.138 18h5.724a2 2 0 001.992-1.76L15.707 6H16a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0010 2H9zm-1 6a1 1 0 112 0v7a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v7a1 1 0 11-2 0V8z" clip-rule="evenodd" />
                     </svg>
                 </button>
             `;
@@ -1238,7 +1238,7 @@
                                 <span class="absolute left-[100%] translate-x-[-100%] transform cause-prob-label" onclick="setImpactSeverityFromLabel(this, 4)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">Catastrófico</span>
                             </div>
                         </div>
-                        <span class="text-xs font-medium px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 impact-severity-badge self-center translate-y-[1px]">Moderado</span>
+                        <span class="inline-block text-xs font-medium px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 impact-severity-badge self-center translate-y-[1px] w-[9rem] text-center whitespace-nowrap">Moderado</span>
                     </div>
                     <input type="hidden" class="impact-severity" value="moderado">
                 </div>
