@@ -171,6 +171,26 @@
         .prob-posible { background-color: #ffe08a; }    /* amarillo suave */
         .prob-probable { background-color: #ffb482; }   /* naranja suave */
         .prob-altamente { background-color: #f28c8c; }  /* rojo suave */
+        /* Indicador: banda vertical a la izquierda en cajas de causa/consecuencia */
+        .cause-box, .impact-box { position: relative; overflow: hidden; }
+        .cause-box.indicator-left::before,
+        .impact-box.indicator-left::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0; bottom: 0;
+            width: 8px;
+        }
+        /* Colores de banda para Probabilidad (causas) */
+        .cause-box.indicator-left.prob-improbable::before { background-color: #b7e4c7; }
+        .cause-box.indicator-left.prob-posible::before { background-color: #ffe08a; }
+        .cause-box.indicator-left.prob-probable::before { background-color: #ffb482; }
+        .cause-box.indicator-left.prob-altamente::before { background-color: #f28c8c; }
+        /* Colores de banda para Impacto (consecuencias) */
+        .impact-box.indicator-left.impact-minor::before { background-color: #b7e4c7; }
+        .impact-box.indicator-left.impact-moderate::before { background-color: #ffe08a; }
+        .impact-box.indicator-left.impact-high::before { background-color: #ffb482; }
+        .impact-box.indicator-left.impact-catastrophic::before { background-color: #f28c8c; }
         /* Indicador de impacto cualitativo de consecuencias (heatmap suave) */
         .impact-minor { background-color: #b7e4c7; }
         .impact-moderate { background-color: #ffe08a; }
@@ -1118,7 +1138,7 @@
                 const probClass = (causeProb === 'improbable') ? 'prob-improbable' : (causeProb === 'probable') ? 'prob-probable' : (causeProb === 'altamente') ? 'prob-altamente' : 'prob-posible';
                 const probLabel = (causeProb === 'improbable') ? 'Improbable' : (causeProb === 'probable') ? 'Probable' : (causeProb === 'altamente') ? 'Altamente probable' : 'Posible';
                 causeDiagramItem.innerHTML = `
-                    <div class="cause-box bg-sky-400 p-2 rounded-lg shadow-sm text-center diagram-box w-full md:w-1/2 order-1 cursor-pointer transition duration-150 ease-out transform hover:shadow-sm hover:-translate-y-px" onclick="focusBowtieGroup('${causeRefId}')"><span class=\"eff-dot ${probClass}\" title=\"Probabilidad: ${probLabel}\"></span>${causeName}</div>
+                    <div class="cause-box bg-sky-400 p-2 rounded-lg shadow-sm text-center diagram-box w-full md:w-1/2 order-1 cursor-pointer transition duration-150 ease-out transform hover:shadow-sm hover:-translate-y-px indicator-left ${probClass}" title="Probabilidad: ${probLabel}" onclick="focusBowtieGroup('${causeRefId}')">${causeName}</div>
                     <div class="preventive-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-2 items-stretch">
                         ${barriersHTML}
                     </div>
@@ -1163,7 +1183,7 @@
                             <polygon points="36,2 46,6 36,10" fill="#ffffff" fill-opacity="0.95"></polygon>
                         </svg>
                     </div>
-                    <div class="impact-box bg-rose-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-3 cursor-pointer transition duration-150 ease-out transform hover:shadow-md hover:-translate-y-px" onclick="focusBowtieGroup('${impactRefId}')"><span class=\"eff-dot ${sevClass}\" title=\"Impacto: ${sevLabel}\"></span>${impactName}</div>`;
+                    <div class="impact-box bg-rose-400 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-3 cursor-pointer transition duration-150 ease-out transform hover:shadow-md hover:-translate-y-px indicator-left ${sevClass}" title="Impacto: ${sevLabel}" onclick="focusBowtieGroup('${impactRefId}')">${impactName}</div>`;
                 impactsContainerDiagram.appendChild(impactDiagramItem);
             });
             if (scrollIntoView && document.getElementById('bowtieDiagramVisualization')) {
