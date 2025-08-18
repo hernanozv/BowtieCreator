@@ -594,11 +594,11 @@
             <h3 id="resetModalTitle" class="text-xl md:text-2xl font-bold mb-4 text-gray-700">Confirmar Reinicio</h3>
             <p id="resetModalMessage" class="text-gray-600 mb-6">¿Estás seguro de que deseas borrar todos los datos ingresados? Esta acción no se puede deshacer.</p>
             <div class="flex justify-end space-x-3">
-                <button onclick="closeResetModal()" class="action-button action-button-secondary">
-                    Cancelar
-                </button>
                 <button id="confirmResetButton" class="action-button action-button-danger">
                     Sí, Reiniciar
+                </button>
+                <button onclick="closeResetModal()" class="action-button action-button-secondary">
+                    Cancelar
                 </button>
             </div>
         </div>
@@ -707,6 +707,20 @@
             const isPicker = e.target.closest && e.target.closest('.barrier-picker-dropdown');
             const isButton = e.target.closest && e.target.closest('.barrier-picker-button');
             if (!isPicker && !isButton) closeAnyOpenBarrierPicker();
+        }
+        function barrierHasAnyOccurrences(barrierId) {
+            if (!barrierId) return false;
+            const inputs = document.querySelectorAll('.preventive-barrier-input, .mitigative-barrier-input');
+            for (const inp of inputs) {
+                if (inp.dataset && inp.dataset.barrierId === barrierId) return true;
+            }
+            return false;
+        }
+        function maybeCleanupBarrierId(barrierId) {
+            if (!barrierId) return;
+            if (!barrierHasAnyOccurrences(barrierId)) {
+                if (typeof barrierRegistryAll !== 'undefined') barrierRegistryAll.delete(barrierId);
+            }
         }
         function getCurrentEffectivenessOfBarrier(barrierId) {
             const inputs = document.querySelectorAll('.preventive-barrier-input, .mitigative-barrier-input');
@@ -1298,7 +1312,24 @@
 
         function removeElement(elementOrId) {
             const element = typeof elementOrId === 'string' ? document.getElementById(elementOrId) : elementOrId;
-            if (element) { element.remove(); }
+            if (!element) { if (typeof debouncedRenderBowTie === 'function') debouncedRenderBowTie(); return; }
+            const barrierIdsToCheck = new Set();
+            try {
+                if (element.classList && element.classList.contains('barrier-input-item')) {
+                    const input = element.querySelector('.preventive-barrier-input, .mitigative-barrier-input');
+                    const id = input && input.dataset ? input.dataset.barrierId : null;
+                    if (id) barrierIdsToCheck.add(id);
+                } else if (element.classList && (element.classList.contains('cause-input-group') || element.classList.contains('impact-input-group'))) {
+                    const inputs = element.querySelectorAll('.preventive-barrier-input, .mitigative-barrier-input');
+                    inputs.forEach(inp => {
+                        const id = inp && inp.dataset ? inp.dataset.barrierId : null;
+                        if (id) barrierIdsToCheck.add(id);
+                    });
+                }
+            } catch(_) {}
+            element.remove();
+            // limpiar del registro las barreras que ya no tienen ocurrencias en el DOM
+            barrierIdsToCheck.forEach(id => { try { maybeCleanupBarrierId(id); } catch(_) {} });
             if (typeof debouncedRenderBowTie === 'function') debouncedRenderBowTie();
         }
 
@@ -1816,6 +1847,10 @@
             document.getElementById('eventBoxDiagram').textContent = 'EVENTO';
             causeCounter = 0;
             impactCounter = 0;
+            // Limpiar registro de barreras compartidas
+            if (typeof closeAnyOpenBarrierPicker === 'function') closeAnyOpenBarrierPicker();
+            if (typeof barrierRegistryAll !== 'undefined') barrierRegistryAll.clear();
+            if (typeof barrierIdCounterAll !== 'undefined') barrierIdCounterAll = 0;
         }
 
         function executeResetFtaAnalysis() {
@@ -1826,6 +1861,10 @@
             document.getElementById('ftaElementsContainer').innerHTML = '';
             document.getElementById('ftaDiagramContainer').innerHTML = '<p class="text-slate-400">El diagrama del FTA aparecerá aquí después de generar.</p>';
             ftaNodeCounter = 0;
+            // Limpiar registro de barreras compartidas
+            if (typeof closeAnyOpenBarrierPicker === 'function') closeAnyOpenBarrierPicker();
+            if (typeof barrierRegistryAll !== 'undefined') barrierRegistryAll.clear();
+            if (typeof barrierIdCounterAll !== 'undefined') barrierIdCounterAll = 0;
         }
         
         function exportCurrentAnalysis() {
