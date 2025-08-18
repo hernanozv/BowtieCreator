@@ -495,7 +495,7 @@
                         <h2 class="text-2xl font-semibold text-center section-title">Diagrama Bow-Tie</h2>
                         <div class="text-right">
                             <button type="button" data-export-ignore="true" onclick="exportBowtieDiagramImage()" class="action-button action-button-secondary">
-                                Exportar imagen
+                                Exportar Diagrama
                             </button>
                         </div>
                     </div>
@@ -515,7 +515,7 @@
                         </div>
                     </div>
                     <!-- Leyendas de Probabilidad e Impacto (debajo del diagrama) -->
-                    <div class="flex flex-col md:flex-row items-start justify-between text-xs text-gray-600 mt-4 gap-3" aria-label="Referencias de colores de probabilidad e impacto" data-export-ignore="true">
+                    <div class="flex flex-col md:flex-row items-start justify-between text-xs text-gray-600 mt-4 gap-3" aria-label="Referencias de colores de probabilidad e impacto">
                         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
                             <span class="mr-1 font-medium text-gray-700">Probabilidad:</span>
                             <span class="flex items-center"><span class="legend-swatch prob-improbable" aria-hidden="true"></span>Improbable</span>
@@ -1274,9 +1274,9 @@
             node.classList.add('exporting');
             innerDiagram.classList.add('exporting');
 
-            // Escala dinámica para mejorar definición apuntando a ~3200px de ancho final
+            // Escala dinámica para mejorar definición apuntando a ~3200px de ancho final (sobre toda la sección visible)
             const targetPx = 3200;
-            const baseScale = Math.max(1, targetPx / Math.max(1, innerDiagram.scrollWidth));
+            const baseScale = Math.max(1, targetPx / Math.max(1, node.scrollWidth));
             const scale = Math.min(4, Math.max(window.devicePixelRatio || 1, 2, baseScale));
 
             // Esperar a que las fuentes estén listas (si el navegador lo soporta)
@@ -1289,86 +1289,15 @@
             // Asegurar que los estilos .exporting se apliquen y el layout esté asentado
             await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-            html2canvas(innerDiagram, {
+            html2canvas(node, {
                 backgroundColor: '#ffffff',
                 scale,
                 useCORS: true,
                 letterRendering: true,
                 imageTimeout: 15000,
                 removeContainer: true,
-                width: innerDiagram.scrollWidth,
-                height: innerDiagram.scrollHeight,
-                onclone: (clonedDoc) => {
-                    try {
-                        const clonedDiagram = clonedDoc.getElementById('bowtieDiagram');
-                        if (!clonedDiagram) return;
-                        // Forzar estilos base
-                        const style = clonedDoc.createElement('style');
-                        style.textContent = `
-                          #bowtieDiagram, #bowtieDiagram * {
-                            line-height: 1.1 !important;
-                            vertical-align: middle !important;
-                            -webkit-font-smoothing: antialiased !important;
-                            -moz-osx-font-smoothing: grayscale !important;
-                            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif !important;
-                          }
-                          /* Centrado vertical por tabla para cajas principales */
-                          #bowtieDiagram #eventBoxDiagram,
-                          #bowtieDiagram .cause-box,
-                          #bowtieDiagram .impact-box {
-                            display: table-cell !important;
-                            vertical-align: middle !important;
-                            text-align: center !important;
-                          }
-                          /* Barreras: mantener alineación de ícono/texto */
-                          #bowtieDiagram .barrier-box {
-                            display: inline-flex !important;
-                            align-items: center !important;
-                            justify-content: flex-start !important;
-                          }
-                        `;
-                        clonedDoc.head.appendChild(style);
-
-                        // Congelar alto y centrar verticalmente cajas clave
-                        const centerSelectors = ['#eventBoxDiagram', '.cause-box', '.impact-box'];
-                        centerSelectors.forEach(sel => {
-                            clonedDiagram.querySelectorAll(sel).forEach(el => {
-                                const rect = el.getBoundingClientRect();
-                                el.style.height = rect.height + 'px';
-                                el.style.lineHeight = rect.height + 'px';
-                                el.style.display = 'block';
-                                el.style.paddingTop = '0px';
-                                el.style.paddingBottom = '0px';
-                                el.style.textAlign = 'center';
-                                el.style.whiteSpace = 'nowrap';
-                                el.style.overflow = 'hidden';
-                                el.style.textOverflow = 'ellipsis';
-                            });
-                        });
-                        // Congelar altura y centrar verticalmente barreras
-                        clonedDiagram.querySelectorAll('.barrier-box').forEach(el => {
-                            const rect = el.getBoundingClientRect();
-                            el.style.minHeight = rect.height + 'px';
-                            el.style.display = 'flex';
-                            el.style.alignItems = 'center';
-                            // En algunos navegadores, los nodos de texto como items flex no se centran igual al rasterizar.
-                            // Envuelve el texto en un span con line-height fijo para asegurar centrado perfecto.
-                            const textNodes = Array.from(el.childNodes).filter(n => n.nodeType === 3 && n.textContent.trim().length > 0);
-                            if (textNodes.length) {
-                                const combined = textNodes.map(n => n.textContent).join(' ').replace(/\s+/g, ' ').trim();
-                                textNodes.forEach(n => el.removeChild(n));
-                                const span = clonedDoc.createElement('span');
-                                span.className = 'barrier-text-export';
-                                span.textContent = combined;
-                                span.style.display = 'inline-block';
-                                span.style.lineHeight = rect.height + 'px';
-                                span.style.whiteSpace = 'nowrap';
-                                span.style.marginLeft = '4px';
-                                el.appendChild(span);
-                            }
-                        });
-                    } catch (_) { /* ignore */ }
-                },
+                width: node.scrollWidth,
+                height: node.scrollHeight,
                 ignoreElements: (el) => el.dataset && el.dataset.exportIgnore === 'true'
             }).then(canvas => {
                 const link = document.createElement('a');
@@ -1761,9 +1690,14 @@
 
         function exportBowTieToXLSX() {
             const riskEvent = document.getElementById('riskEvent').value || "Evento no definido";
+            // Formato nuevo (no retrocompatible):
+            // ["EventoRiesgo", <texto>]
+            // ["Causa", <nombre>, <probabilidad: improbable|posible|probable|altamente>, <barrera 1 [eff=..]>, ...]
+            // ["Consecuencia", <nombre>, <impacto: menor|moderado|alto|catastrofico>, <barrera 1 [eff=..]>, ...]
             let data = [[ "EventoRiesgo", riskEvent ]];
             document.querySelectorAll('.cause-input-group').forEach(group => {
                 const causeName = group.querySelector('.cause-name-input').value;
+                const causeProb = (group.querySelector('.cause-probability')?.value || 'posible').trim();
                 // Exportar cada barrera como "texto [eff=high|medium|low]" (preservar orden actual)
                 const items = Array.from(group.querySelectorAll('.barrier-input-item'));
                 const barriers = items.map(it => {
@@ -1772,11 +1706,12 @@
                     const eff = (it.querySelector('.barrier-effectiveness')?.value || 'medium');
                     return `${txt} [eff=${eff}]`;
                 });
-                data.push(["Causa", causeName || "Causa sin nombre", ...barriers]);
+                data.push(["Causa", causeName || "Causa sin nombre", causeProb, ...barriers]);
             });
             data.push([]); 
             document.querySelectorAll('.impact-input-group').forEach(group => {
                 const impactName = group.querySelector('.impact-name-input').value;
+                const impactSeverity = (group.querySelector('.impact-severity')?.value || 'moderado').trim();
                 // Exportar cada barrera como "texto [eff=high|medium|low]" (preservar orden actual)
                 const items = Array.from(group.querySelectorAll('.barrier-input-item'));
                 const barriers = items.map(it => {
@@ -1785,7 +1720,7 @@
                     const eff = (it.querySelector('.barrier-effectiveness')?.value || 'medium');
                     return `${txt} [eff=${eff}]`;
                 });
-                data.push(["Consecuencia", impactName || "Consecuencia sin nombre", ...barriers]);
+                data.push(["Consecuencia", impactName || "Consecuencia sin nombre", impactSeverity, ...barriers]);
             });
             const worksheet = XLSX.utils.aoa_to_sheet(data);
             const workbook = XLSX.utils.book_new();
@@ -1809,18 +1744,26 @@
                         eff: m[1].toLowerCase()
                     };
                 }
-                return { text: s, eff: 'medium' }; // compatibilidad hacia atrás
+                return { text: s, eff: 'medium' };
             };
+            const probKeyToVal = { improbable: 1, posible: 2, probable: 3, altamente: 4 };
+            const sevKeyToVal = { menor: 1, moderado: 2, alto: 3, catastrofico: 4 };
             jsonData.forEach(row => {
                 if (row.length < 2) return;
                 const elementType = row[0];
                 const elementName = row[1];
-                const barriers = row.slice(2).filter(b => String(b).trim() !== "");
                 if (elementType === "Causa") {
                     const causeDiv = addCauseInput();
                     if (causeDiv) {
                         causeDiv.querySelector('.cause-name-input').value = elementName;
+                        const probKey = String(row[2] || '').trim().toLowerCase();
+                        const slider = causeDiv.querySelector('.cause-probability-slider');
+                        if (slider && probKeyToVal[probKey]) {
+                            try { slider.value = probKeyToVal[probKey]; } catch(_) {}
+                            updateCauseProbabilitySlider(slider);
+                        }
                         const causeId = causeDiv.id;
+                        const barriers = row.slice(3).filter(b => String(b).trim() !== "");
                         barriers.forEach(barrierDesc => {
                             const meta = parseBarrierCell(barrierDesc);
                             const barrierInput = addPreventiveBarrierInput(causeId);
@@ -1833,9 +1776,16 @@
                     }
                 } else if (elementType === "Consecuencia") {
                     const impactDiv = addImpactInput();
-                     if (impactDiv) {
+                    if (impactDiv) {
                         impactDiv.querySelector('.impact-name-input').value = elementName;
+                        const sevKey = String(row[2] || '').trim().toLowerCase();
+                        const slider = impactDiv.querySelector('.cause-probability-slider');
+                        if (slider && sevKeyToVal[sevKey]) {
+                            try { slider.value = sevKeyToVal[sevKey]; } catch(_) {}
+                            updateImpactSeveritySlider(slider);
+                        }
                         const impactId = impactDiv.id;
+                        const barriers = row.slice(3).filter(b => String(b).trim() !== "");
                         barriers.forEach(barrierDesc => {
                             const meta = parseBarrierCell(barrierDesc);
                             const barrierInput = addMitigativeBarrierInput(impactId);
@@ -1855,10 +1805,12 @@
             const topEventDesc = document.getElementById('ftaTopEventDesc').value || "Top Event no definido";
             const topEventGate = document.getElementById('ftaTopEventGate').value || "OR";
             const topEventInputs = document.getElementById('ftaTopEventInputs').value || "";
+            const topEventProb = document.getElementById('ftaTopEventProb').value || ""; // porcentaje mostrado
 
             let data = [["FTATopEventDesc", topEventDesc], 
                         ["FTATopEventGate", topEventGate],
-                        ["FTATopEventInputs", topEventInputs]];
+                        ["FTATopEventInputs", topEventInputs],
+                        ["FTATopEventProb", topEventProb]];
             
             document.querySelectorAll('.fta-element-input-group').forEach(group => {
                 const fullId = group.id;
@@ -1893,31 +1845,40 @@
             document.getElementById('ftaTopEventDesc').value = findRowValue("FTATopEventDesc");
             document.getElementById('ftaTopEventGate').value = findRowValue("FTATopEventGate") || "OR";
             document.getElementById('ftaTopEventInputs').value = findRowValue("FTATopEventInputs");
+            const topProb = findRowValue("FTATopEventProb");
+            if (topProb !== "") {
+                document.getElementById('ftaTopEventProb').value = topProb;
+            }
 
-            jsonData.forEach(row => {
-                if (["FTATopEventDesc", "FTATopEventProb", "FTATopEventGate", "FTATopEventInputs"].includes(row[0]) || row.length < 4) return; 
-                
-                const shortIdFromFile = row[0]; 
+            // Crear elementos en orden por ID (N1, N2, ...) para preservar referencias
+            const nodeRows = jsonData.filter(row => Array.isArray(row) && row[0] && /^N\d+$/i.test(String(row[0])));
+            nodeRows.sort((a, b) => {
+                const na = parseInt(String(a[0]).slice(1)) || 0;
+                const nb = parseInt(String(b[0]).slice(1)) || 0;
+                return na - nb;
+            });
+            nodeRows.forEach(row => {
+                const shortIdFromFile = row[0];
                 const description = row[1];
-                const probability = row[2]; 
+                const probability = row[2];
                 const type = row[3];
-                const gate = row[4] || 'OR'; 
+                const gate = row[4] || 'OR';
                 const inputs = row[5] || '';
 
-                addFtaElementInput(); 
-                const newElementGroup = document.getElementById(`fta-node-${ftaNodeCounter}`); 
+                addFtaElementInput();
+                const newElementGroup = document.getElementById(`fta-node-${ftaNodeCounter}`);
                 if (newElementGroup) {
                     newElementGroup.querySelector('.fta-element-desc').value = description;
                     const typeSelect = newElementGroup.querySelector('.fta-element-type');
                     typeSelect.value = type;
-                    toggleFtaGateInput(`fta-node-${ftaNodeCounter}`); 
-                    
+                    toggleFtaGateInput(`fta-node-${ftaNodeCounter}`);
+
                     if (type === 'BASIC') {
-                         newElementGroup.querySelector('.fta-element-prob').value = probability;
+                        newElementGroup.querySelector('.fta-element-prob').value = probability;
                     } else if (type === 'INTERMEDIATE') {
                         newElementGroup.querySelector('.fta-element-gate').value = gate;
                         newElementGroup.querySelector('.fta-element-inputs').value = inputs;
-                        newElementGroup.querySelector('.fta-element-prob').value = ''; 
+                        newElementGroup.querySelector('.fta-element-prob').value = '';
                     }
                 }
             });
