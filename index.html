@@ -1379,9 +1379,20 @@
             );
             const maxNodeH = Math.max(...causes.map(c => calcNodeH(c.name)), ...impacts.map(i => calcNodeH(i.name)), 44);
             const rowH = Math.max(maxNodeH + 30, 60 + maxB * 22);
-            const H = Math.max(420, numRows * rowH + 100);
+            // Pre-compute event circle text to determine dynamic R
+            const evWords = riskEventName.split(' ');
+            const evMaxCPL = 13;
+            const evLines = [];
+            let evCur = '';
+            evWords.forEach(w => {
+                const candidate = evCur ? evCur + ' ' + w : w;
+                if (candidate.length > evMaxCPL && evCur) { evLines.push(evCur); evCur = w; }
+                else evCur = candidate;
+            });
+            if (evCur) evLines.push(evCur);
+            const R = Math.max(62, 18 + evLines.length * 16);
+            const H = Math.max(420, numRows * rowH + 100, 2 * R + 80);
             const cx = W / 2, cy = H / 2;
-            const R = 62;
             const nodeW = 190;
             const leftNodeX = 16, rightNodeX = W - nodeW - 16;
 
@@ -1498,7 +1509,14 @@
                 }
 
                 // Barreras
-                bPoints.forEach(({ bx, by, barrier }) => {
+                // Dirección base del label: "hacia afuera" del bowtie (alejarse del centro)
+                // preventive: causa arriba → labels arriba (sign=1), causa abajo → labels abajo (sign=-1)
+                // mitigative: impacto arriba → labels arriba (sign=1), impacto abajo → labels abajo (sign=-1)
+                const baseSign = barrierSide === 'preventive'
+                    ? (y1 <= cy ? 1 : -1)
+                    : (y2 <= cy ? 1 : -1);
+
+                bPoints.forEach(({ bx, by, barrier }, bIdx) => {
                     const effColor = effColors[barrier.eff] || effColors.medium;
                     const effLabel = barrier.eff === 'high' ? 'Alta' : barrier.eff === 'low' ? 'Baja' : 'Media';
                     const bg = el('g', { style: 'cursor:pointer' });
@@ -1512,19 +1530,19 @@
                         fill: effColor, 'fill-opacity': 0.88,
                         transform: `translate(${bx},${by}) rotate(${pathAngle})` }));
 
-                    // Label flotante: causa → arriba (perpendicular "above"), consecuencia → abajo
-                    const sign = barrierSide === 'preventive' ? 1 : -1;
+                    // Label flotante: alterna arriba/abajo entre barreras del mismo path para evitar solapamiento
+                    const labelSign = baseSign * (bIdx % 2 === 0 ? 1 : -1);
                     const bLines = wrapSvgText(barrier.text, 14, 3);
                     const lW = 110;
                     const lH = 12 + bLines.length * 14;
                     const dist = 50 + lH / 2;
-                    const lx = bx + sign * uy * dist;
-                    const ly = by - sign * ux * dist;
+                    const lx = bx + labelSign * uy * dist;
+                    const ly = by - labelSign * ux * dist;
 
                     // Connector
                     bg.appendChild(el('line', {
-                        x1: bx + sign * uy * 22, y1: by - sign * ux * 22,
-                        x2: lx, y2: ly + (ly < by ? lH / 2 : -lH / 2),
+                        x1: bx + labelSign * uy * 22, y1: by - labelSign * ux * 22,
+                        x2: lx, y2: ly + (labelSign > 0 ? lH / 2 : -lH / 2),
                         stroke: effColor, 'stroke-width': 1, 'stroke-dasharray': '3,2', 'stroke-opacity': 0.55
                     }));
 
@@ -1585,20 +1603,10 @@
             eventGroup.appendChild(el('circle', { cx, cy, r: R + 3, fill: 'rgba(255,255,255,0.6)', stroke: 'none' }));
             eventGroup.appendChild(el('circle', { cx, cy, r: R, fill: '#FFF159', stroke: '#333333', 'stroke-width': 2.5 }));
 
-            // Texto del evento (word-wrap manual)
-            const words = riskEventName.split(' ');
-            const maxChars = 15;
-            const lines = [];
-            let cur = '';
-            words.forEach(w => {
-                if ((cur + (cur ? ' ' : '') + w).length > maxChars && cur) { lines.push(cur); cur = w; }
-                else { cur = cur ? cur + ' ' + w : w; }
-            });
-            if (cur) lines.push(cur);
-            if (lines.length > 4) { lines.splice(4); lines[3] = lines[3].slice(0, 13) + '\u2026'; }
-            const lh = 16, ty0 = cy - ((lines.length - 1) * lh) / 2;
+            // Texto del evento (word-wrap pre-computado, sin truncado)
+            const lh = 16, ty0 = cy - ((evLines.length - 1) * lh) / 2;
             const evTxt = el('text', { x: cx, y: ty0, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 700, fill: '#1a1a1a', style: 'pointer-events:none' });
-            lines.forEach((line, i) => {
+            evLines.forEach((line, i) => {
                 const sp = el('tspan', { x: cx, dy: i === 0 ? 0 : lh });
                 sp.textContent = line;
                 evTxt.appendChild(sp);
