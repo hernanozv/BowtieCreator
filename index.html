@@ -1115,10 +1115,11 @@
         function updateBarrierEffDot(selectEl) {
             const item = selectEl.closest('.barrier-input-item');
             if (!item) return;
-            const dot = item.querySelector('.barrier-eff-indicator');
-            if (dot) {
-                dot.className = 'barrier-eff-indicator eff-dot ' +
-                    (selectEl.value === 'high' ? 'eff-high' : selectEl.value === 'low' ? 'eff-low' : 'eff-medium');
+            const input = item.querySelector('input[type=text]');
+            if (input) {
+                input.style.background = selectEl.value === 'high' ? 'rgba(22,163,74,0.08)' :
+                                         selectEl.value === 'low'  ? 'rgba(220,38,38,0.08)' :
+                                                                      'rgba(245,158,11,0.08)';
             }
             if (typeof debouncedRenderBowTie === 'function') debouncedRenderBowTie();
         }
@@ -1207,8 +1208,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M17 10l-7 7-7-7h14z"/></svg>
                   </button>
                 </div>
-                <span class="barrier-eff-indicator eff-dot eff-medium flex-shrink-0" title="Efectividad media"></span>
-                <input type="text" class="w-full p-1 border border-gray-300 rounded-md text-sm preventive-barrier-input" placeholder="Ej: Procedimiento de bloqueo, revisión…">
+                <input type="text" class="w-full p-1 border border-gray-300 rounded-md text-sm preventive-barrier-input" placeholder="Ej: Procedimiento de bloqueo, revisión…" style="background:rgba(245,158,11,0.08)">
                 <select class="barrier-effectiveness text-xs border border-gray-300 rounded-md p-1 ml-1" title="Efectividad" onchange="updateBarrierEffDot(this)">
                     <option value="high">Alta</option>
                     <option value="medium" selected>Media</option>
@@ -1311,8 +1311,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M17 10l-7 7-7-7h14z"/></svg>
                   </button>
                 </div>
-                <span class="barrier-eff-indicator eff-dot eff-medium flex-shrink-0" title="Efectividad media"></span>
-                <input type="text" class="w-full p-1 border border-gray-300 rounded-md text-sm mitigative-barrier-input" placeholder="Ej: Plan de contingencia, alarma…">
+                <input type="text" class="w-full p-1 border border-gray-300 rounded-md text-sm mitigative-barrier-input" placeholder="Ej: Plan de contingencia, alarma…" style="background:rgba(245,158,11,0.08)">
                 <select class="barrier-effectiveness text-xs border border-gray-300 rounded-md p-1 ml-1" title="Efectividad" onchange="updateBarrierEffDot(this)">
                     <option value="high">Alta</option>
                     <option value="medium" selected>Media</option>
@@ -1659,8 +1658,6 @@
                     // Shadow + Box
                     bg.appendChild(el('rect', { x: lx - lW / 2 + 1, y: ly - lH / 2 + 1, width: lW, height: lH, rx: 6, fill: 'rgba(0,0,0,0.07)' }));
                     bg.appendChild(el('rect', { x: lx - lW / 2, y: ly - lH / 2, width: lW, height: lH, rx: 6, fill: '#ffffff', stroke: effColor, 'stroke-width': 1.5 }));
-                    // Dot de efectividad en esquina superior izquierda del label
-                    bg.appendChild(el('circle', { cx: lx - lW / 2 + 6, cy: ly - lH / 2 + 5, r: 2.5, fill: effColor }));
                     // Texto multi-línea centrado
                     const bTextY0 = ly - (bLines.length - 1) * 7 + 4;
                     const te = el('text', { x: lx, y: bTextY0, 'font-size': 10, fill: '#1a1a1a', 'text-anchor': 'middle', style: 'pointer-events:none' });
