@@ -1463,7 +1463,8 @@
             });
 
             // Fondo
-            svg.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: '#fafafa', rx: 10 }));
+            const bgRect = el('rect', { x: 0, y: 0, width: W, height: H, fill: '#fafafa', rx: 10 });
+            svg.appendChild(bgRect);
 
             // Triángulos decorativos
             if (causes.length > 0) {
@@ -1481,14 +1482,18 @@
                 }));
             }
 
-            // Etiquetas de zona
+            // Etiquetas de zona — posicionadas sobre el borde superior real del primer nodo
             if (causes.length > 0) {
                 const topY = getNodeCY(0, causes.length);
-                svg.appendChild(txt('CAUSAS', { x: leftNodeX + nodeW / 2, y: Math.max(18, topY - 28), 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, 'letter-spacing': 1.5, fill: '#888' }));
+                const topNodeH = calcNodeH(causes[0].name);
+                const labelY = Math.max(14, topY - topNodeH / 2 - 8);
+                svg.appendChild(txt('CAUSAS', { x: leftNodeX + nodeW / 2, y: labelY, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, 'letter-spacing': 1.5, fill: '#888' }));
             }
             if (impacts.length > 0) {
                 const topY = getNodeCY(0, impacts.length);
-                svg.appendChild(txt('CONSECUENCIAS', { x: rightNodeX + nodeW / 2, y: Math.max(18, topY - 28), 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, 'letter-spacing': 1.5, fill: '#888' }));
+                const topNodeH = calcNodeH(impacts[0].name);
+                const labelY = Math.max(14, topY - topNodeH / 2 - 8);
+                svg.appendChild(txt('CONSECUENCIAS', { x: rightNodeX + nodeW / 2, y: labelY, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, 'letter-spacing': 1.5, fill: '#888' }));
             }
 
             // --- Grupos de pathways (para resaltado con hover) ---
@@ -1623,6 +1628,21 @@
                     pathGroups.forEach(other => { other.style.opacity = ''; });
                 });
             });
+
+            // --- Expandir SVG bounds para labels de barrera fuera de [0, H] ---
+            if (placedRects.length > 0) {
+                const labelMinY = Math.min(...placedRects.map(r => r.y));
+                const labelMaxY = Math.max(...placedRects.map(r => r.y + r.h));
+                const svgMinY = Math.min(0, labelMinY - 14);
+                const svgMaxY = Math.max(H, labelMaxY + 14);
+                if (svgMinY < 0 || svgMaxY > H) {
+                    const newH = svgMaxY - svgMinY;
+                    svg.setAttribute('height', newH);
+                    svg.setAttribute('viewBox', `0 ${svgMinY} ${W} ${newH}`);
+                    bgRect.setAttribute('y', svgMinY);
+                    bgRect.setAttribute('height', newH);
+                }
+            }
 
             // --- Evento central (encima de todo) ---
             const eventGroup = el('g', { style: 'cursor:default' });
