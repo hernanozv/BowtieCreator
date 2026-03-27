@@ -18,14 +18,20 @@
         }
         /* Helpers JS movidos al <script> para evitar errores CSS */
         .corp-header {
-            background-color: #ffffff;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f8f8 100%);
             border-bottom: 4px solid #FFF159; /* Acento amarillo Mercado Libre */
         }
         .corp-title {
             color: #333333; /* Texto principal oscuro para alto contraste */
         }
         .corp-subtitle {
-            color: #666666; /* Gris secundario para subtítulos */
+            display: inline-block;
+            color: #555555;
+            background: #f0f0f0;
+            border: 1px solid #e0e0e0;
+            border-radius: 9999px;
+            padding: 2px 14px;
+            font-size: 0.875rem;
         }
         .input-group {
             border: 1px solid #e5e7eb;
@@ -49,17 +55,20 @@
             font-weight: 600;
             padding: 0.5rem 1.25rem;
             border-radius: 0.375rem;
-            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, transform 0.1s ease;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.08);
             border: 1px solid transparent;
         }
+        .action-button:active {
+            transform: scale(0.96);
+        }
         .action-button-primary {
-            background-color: #333333;
-            color: #ffffff;
-            border-color: #333333;
+            background-color: #FFF159;
+            color: #1a1a1a;
+            border-color: #f0d800;
         }
         .action-button-primary:hover {
-            background-color: #000000;
+            background-color: #FFE600;
         }
         .action-button-secondary {
             background-color: #f3f4f6; /* Gris muy claro */
@@ -70,26 +79,31 @@
              background-color: #e5e7eb;
         }
         .action-button-danger {
-            background-color: #ef4444;
-            color: #ffffff;
+            background-color: transparent;
+            color: #dc2626;
+            border: 2px solid #dc2626;
         }
         .action-button-danger:hover {
-             background-color: #dc2626;
+            background-color: #fee2e2;
         }
 
         /* Pestañas */
         .tab-button-active {
-            border-color: #333333; 
+            background-color: #ffffff;
+            border-color: #FFF159;
             color: #333333;
-            font-weight: 600;
+            font-weight: 700;
+            box-shadow: 0 -1px 3px rgba(0,0,0,0.06);
         }
         .tab-button-inactive {
+            background-color: #f5f5f5;
             border-color: transparent;
-            color: #6b7280; 
+            color: #9ca3af;
         }
         .tab-button-inactive:hover {
-            border-color: #d1d5db; 
-            color: #333333; 
+            background-color: #ffffff;
+            border-color: #d1d5db;
+            color: #333333;
         }
 
         /* --- Estilos para el diagrama BowTie SVG --- */
@@ -170,6 +184,32 @@
         .eff-high { background-color: #16a34a; }   /* verde */
         .eff-medium { background-color: #f59e0b; } /* ámbar */
         .eff-low { background-color: #dc2626; }    /* rojo */
+
+        /* Animación de entrada para nuevas cards */
+        @keyframes slideInDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .input-group-animate {
+            animation: slideInDown 0.2s ease-out;
+        }
+
+        /* Pill badges para alertas del panel de riesgo */
+        .risk-alert-pill {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 9999px;
+            flex-shrink: 0;
+            white-space: nowrap;
+            align-self: flex-start;
+            margin-top: 1px;
+        }
+        .risk-alert-pill.critical { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .risk-alert-pill.warning  { background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; }
+        .risk-alert-pill.info     { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
+        .risk-alert-pill.good     { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
         /* Indicador de probabilidad cualitativa de causas (heatmap suave) */
         .prob-improbable { background-color: #b7e4c7; } /* verde suave */
         .prob-posible { background-color: #ffe08a; }    /* amarillo suave */
@@ -421,13 +461,13 @@
 
         <div class="flex flex-col sm:flex-row flex-wrap justify-center items-center space-y-3 sm:space-y-0 sm:space-x-3 mb-8 pb-4 border-b border-gray-200">
             <button id="generateBtn" onclick="generateCurrentDiagram()" class="action-button action-button-primary">
-                Generar/Actualizar Diagrama
+                ⟳ Generar/Actualizar Diagrama
             </button>
             <button onclick="exportCurrentAnalysis()" class="action-button action-button-secondary">
-                Exportar
+                ↓ Exportar
             </button>
             <label for="importFile" class="action-button action-button-secondary cursor-pointer">
-                Importar
+                ↑ Importar
             </label>
             <input type="file" id="importFile" class="hidden" accept=".xlsx, .xls" onchange="handleCurrentFileImport(event)">
             <button onclick="confirmCurrentReset()" class="action-button action-button-danger">
@@ -452,7 +492,7 @@
                     <h2 class="text-2xl font-semibold mb-6 section-title border-b pb-2">1. Definición del Riesgo (BowTie)</h2>
                     <div class="mb-6">
                         <label for="riskEvent" class="block text-lg font-medium text-gray-700 mb-2">Evento Central de Riesgo:</label>
-                        <input type="text" id="riskEvent" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Robo de Mercadería">
+                        <input type="text" id="riskEvent" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-yellow-400 focus:border-yellow-400" placeholder="Ej: Robo de Mercadería">
                     </div>
                     <div class="grid md:grid-cols-2 gap-8">
                         <div>
@@ -512,7 +552,7 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
                             <div>
                                 <label for="ftaTopEventDesc" class="block text-sm font-medium text-gray-700">Descripción:</label>
-                                <input type="text" id="ftaTopEventDesc" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Descripción del evento principal">
+                                <input type="text" id="ftaTopEventDesc" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-yellow-400 focus:border-yellow-400" placeholder="Descripción del evento principal">
                             </div>
                             <div>
                                 <label for="ftaTopEventProb" class="block text-sm font-medium text-gray-700">Probabilidad (%):</label>
@@ -522,14 +562,14 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label for="ftaTopEventGate" class="block text-sm font-medium text-gray-700">Compuerta (debajo del Top Event):</label>
-                                <select id="ftaTopEventGate" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                <select id="ftaTopEventGate" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-yellow-400 focus:border-yellow-400">
                                     <option value="OR">OR</option>
                                     <option value="AND">AND</option>
                                 </select>
                             </div>
                             <div>
                                 <label for="ftaTopEventInputs" class="block text-sm font-medium text-gray-700">IDs de Entradas a esta Compuerta (Ej: N1, N2):</label>
-                                <input type="text" id="ftaTopEventInputs" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="N1, N2, ...">
+                                <input type="text" id="ftaTopEventInputs" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-yellow-400 focus:border-yellow-400" placeholder="N1, N2, ...">
                             </div>
                         </div>
                          <div class="mt-3 text-right">
@@ -998,6 +1038,11 @@
                 badge.className = base + color;
                 badge.textContent = label;
             }
+            // Actualizar borde izquierdo dinámico de la card
+            const borderColor = key === 'improbable' ? '#16a34a' :
+                                key === 'posible'    ? '#f59e0b' :
+                                key === 'probable'   ? '#f97316' : '#dc2626';
+            group.style.borderLeftColor = borderColor;
             if (typeof debouncedRenderBowTie === 'function') debouncedRenderBowTie();
         }
 
@@ -1036,6 +1081,11 @@
                 badge.className = base + color;
                 badge.textContent = label;
             }
+            // Actualizar borde izquierdo dinámico de la card
+            const borderColor = key === 'menor'    ? '#16a34a' :
+                                key === 'moderado' ? '#f59e0b' :
+                                key === 'alto'     ? '#f97316' : '#dc2626';
+            group.style.borderLeftColor = borderColor;
             if (typeof debouncedRenderBowTie === 'function') debouncedRenderBowTie();
         }
         function setImpactSeverityFromLabel(labelEl, value) {
@@ -1062,12 +1112,23 @@
         }
 
 
+        function updateBarrierEffDot(selectEl) {
+            const item = selectEl.closest('.barrier-input-item');
+            if (!item) return;
+            const dot = item.querySelector('.barrier-eff-indicator');
+            if (dot) {
+                dot.className = 'barrier-eff-indicator eff-dot ' +
+                    (selectEl.value === 'high' ? 'eff-high' : selectEl.value === 'low' ? 'eff-low' : 'eff-medium');
+            }
+            if (typeof debouncedRenderBowTie === 'function') debouncedRenderBowTie();
+        }
+
         function addCauseInput() {
             causeCounter++;
             const causeId = `cause-${causeCounter}`;
             const container = document.getElementById('causesContainer');
             const div = document.createElement('div');
-            div.className = 'input-group cause-input-group';
+            div.className = 'input-group cause-input-group input-group-animate';
             div.id = causeId;
             const removeElementHandler = `removeElement('${causeId}')`;
             const addPreventiveBarrierHandler = `addPreventiveBarrierInput('${causeId}')`;
@@ -1080,7 +1141,7 @@
                         </svg>
                     </button>
                 </div>
-                <input type="text" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 cause-name-input" placeholder="Describir la causa raíz…">
+                <input type="text" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-yellow-400 focus:border-yellow-400 cause-name-input" placeholder="Describir la causa raíz…">
                 <div class="mt-2">
                     <label class="text-sm font-medium text-gray-600">Probabilidad:</label>
                     <div class="mt-1 flex items-center gap-3">
@@ -1112,7 +1173,7 @@
                 <div class="mt-3">
                     <h4 class="text-sm font-medium text-gray-600 mb-1">Barreras Preventivas:</h4>
                     <div class="preventive-barriers-container space-y-2"></div>
-                    <button onclick="${addPreventiveBarrierHandler}" class="mt-2 text-xs bg-sky-200 hover:bg-sky-300 text-sky-800 font-semibold py-1 px-2 rounded-md">
+                    <button onclick="${addPreventiveBarrierHandler}" class="mt-2 text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 font-semibold py-1 px-2 rounded-md border border-amber-300">
                         + Añadir Barrera Preventiva
                     </button>
                 </div>
@@ -1146,8 +1207,9 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M17 10l-7 7-7-7h14z"/></svg>
                   </button>
                 </div>
+                <span class="barrier-eff-indicator eff-dot eff-medium flex-shrink-0" title="Efectividad media"></span>
                 <input type="text" class="w-full p-1 border border-gray-300 rounded-md text-sm preventive-barrier-input" placeholder="Ej: Procedimiento de bloqueo, revisión…">
-                <select class="barrier-effectiveness text-xs border border-gray-300 rounded-md p-1 ml-1" title="Efectividad">
+                <select class="barrier-effectiveness text-xs border border-gray-300 rounded-md p-1 ml-1" title="Efectividad" onchange="updateBarrierEffDot(this)">
                     <option value="high">Alta</option>
                     <option value="medium" selected>Media</option>
                     <option value="low">Baja</option>
@@ -1182,7 +1244,7 @@
             const impactId = `impact-${impactCounter}`;
             const container = document.getElementById('impactsContainer');
             const div = document.createElement('div');
-            div.className = 'input-group impact-input-group';
+            div.className = 'input-group impact-input-group input-group-animate';
             div.id = impactId;
             const removeElementHandler = `removeElement('${impactId}')`;
             const addMitigativeBarrierHandler = `addMitigativeBarrierInput('${impactId}')`;
@@ -1195,7 +1257,7 @@
                         </svg>
                     </button>
                 </div>
-                <input type="text" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 impact-name-input" placeholder="Describir la consecuencia…">
+                <input type="text" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-yellow-400 focus:border-yellow-400 impact-name-input" placeholder="Describir la consecuencia…">
                 <div class="mt-2">
                     <label class="text-sm font-medium text-gray-600">Impacto:</label>
                     <div class="mt-1 flex items-center gap-3">
@@ -1215,7 +1277,7 @@
                 <div class="mt-3">
                     <h4 class="text-sm font-medium text-gray-600 mb-1">Barreras Mitigantes:</h4>
                     <div class="mitigative-barriers-container space-y-2"></div>
-                    <button onclick="${addMitigativeBarrierHandler}" class="mt-2 text-xs bg-rose-200 hover:bg-rose-300 text-rose-800 font-semibold py-1 px-2 rounded-md">
+                    <button onclick="${addMitigativeBarrierHandler}" class="mt-2 text-xs bg-orange-100 hover:bg-orange-200 text-orange-800 font-semibold py-1 px-2 rounded-md border border-orange-300">
                         + Añadir Barrera Mitigante
                     </button>
                 </div>
@@ -1249,8 +1311,9 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M17 10l-7 7-7-7h14z"/></svg>
                   </button>
                 </div>
+                <span class="barrier-eff-indicator eff-dot eff-medium flex-shrink-0" title="Efectividad media"></span>
                 <input type="text" class="w-full p-1 border border-gray-300 rounded-md text-sm mitigative-barrier-input" placeholder="Ej: Plan de contingencia, alarma…">
-                <select class="barrier-effectiveness text-xs border border-gray-300 rounded-md p-1 ml-1" title="Efectividad">
+                <select class="barrier-effectiveness text-xs border border-gray-300 rounded-md p-1 ml-1" title="Efectividad" onchange="updateBarrierEffDot(this)">
                     <option value="high">Alta</option>
                     <option value="medium" selected>Media</option>
                     <option value="low">Baja</option>
@@ -1462,8 +1525,24 @@
                 style: 'display:block;font-family:Inter,system-ui,sans-serif;'
             });
 
+            // Defs: gradientes y filtros
+            const defs = el('defs', {});
+            // Gradiente radial para el círculo del evento central
+            const rg = el('radialGradient', { id: 'eventGradient', cx: '35%', cy: '35%', r: '65%' });
+            [['0%', '#FFF159'], ['100%', '#FFE600']].forEach(([off, col]) => {
+                const s = el('stop', { offset: off, 'stop-color': col }); rg.appendChild(s);
+            });
+            defs.appendChild(rg);
+            // Gradiente radial sutil para el fondo del diagrama
+            const bgGrad = el('radialGradient', { id: 'bgGradient', cx: '50%', cy: '50%', r: '70%' });
+            [['0%', '#ffffff'], ['100%', '#f2f2f2']].forEach(([off, col]) => {
+                const s = el('stop', { offset: off, 'stop-color': col }); bgGrad.appendChild(s);
+            });
+            defs.appendChild(bgGrad);
+            svg.appendChild(defs);
+
             // Fondo
-            const bgRect = el('rect', { x: 0, y: 0, width: W, height: H, fill: '#fafafa', rx: 10 });
+            const bgRect = el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#bgGradient)', rx: 10 });
             svg.appendChild(bgRect);
 
             // Triángulos decorativos
@@ -1471,14 +1550,14 @@
                 const y0 = getNodeCY(0, causes.length), y1 = getNodeCY(causes.length - 1, causes.length);
                 svg.appendChild(el('polygon', {
                     points: `${leftNodeX + nodeW},${y0} ${cx - R},${cy} ${leftNodeX + nodeW},${y1}`,
-                    fill: 'rgba(255,241,89,0.13)', stroke: 'none'
+                    fill: 'rgba(255,241,89,0.18)', stroke: 'none'
                 }));
             }
             if (impacts.length > 0) {
                 const y0 = getNodeCY(0, impacts.length), y1 = getNodeCY(impacts.length - 1, impacts.length);
                 svg.appendChild(el('polygon', {
                     points: `${rightNodeX},${y0} ${cx + R},${cy} ${rightNodeX},${y1}`,
-                    fill: 'rgba(245,34,45,0.05)', stroke: 'none'
+                    fill: 'rgba(245,34,45,0.10)', stroke: 'none'
                 }));
             }
 
@@ -1574,12 +1653,14 @@
                     bg.appendChild(el('line', {
                         x1: bx + labelSign * uy * 22, y1: by - labelSign * ux * 22,
                         x2: lx, y2: ly + (labelSign > 0 ? lH / 2 : -lH / 2),
-                        stroke: effColor, 'stroke-width': 1, 'stroke-dasharray': '3,2', 'stroke-opacity': 0.55
+                        stroke: effColor, 'stroke-width': 1, 'stroke-dasharray': '3,2', 'stroke-opacity': 0.35
                     }));
 
                     // Shadow + Box
-                    bg.appendChild(el('rect', { x: lx - lW / 2 + 1, y: ly - lH / 2 + 1, width: lW, height: lH, rx: 4, fill: 'rgba(0,0,0,0.07)' }));
-                    bg.appendChild(el('rect', { x: lx - lW / 2, y: ly - lH / 2, width: lW, height: lH, rx: 4, fill: '#ffffff', stroke: effColor, 'stroke-width': 1.5 }));
+                    bg.appendChild(el('rect', { x: lx - lW / 2 + 1, y: ly - lH / 2 + 1, width: lW, height: lH, rx: 6, fill: 'rgba(0,0,0,0.07)' }));
+                    bg.appendChild(el('rect', { x: lx - lW / 2, y: ly - lH / 2, width: lW, height: lH, rx: 6, fill: '#ffffff', stroke: effColor, 'stroke-width': 1.5 }));
+                    // Dot de efectividad en esquina superior izquierda del label
+                    bg.appendChild(el('circle', { cx: lx - lW / 2 + 6, cy: ly - lH / 2 + 5, r: 2.5, fill: effColor }));
                     // Texto multi-línea centrado
                     const bTextY0 = ly - (bLines.length - 1) * 7 + 4;
                     const te = el('text', { x: lx, y: bTextY0, 'font-size': 10, fill: '#1a1a1a', 'text-anchor': 'middle', style: 'pointer-events:none' });
@@ -1647,7 +1728,8 @@
             // --- Evento central (encima de todo) ---
             const eventGroup = el('g', { style: 'cursor:default' });
             eventGroup.appendChild(el('circle', { cx, cy, r: R + 3, fill: 'rgba(255,255,255,0.6)', stroke: 'none' }));
-            eventGroup.appendChild(el('circle', { cx, cy, r: R, fill: '#FFF159', stroke: '#333333', 'stroke-width': 2.5 }));
+            eventGroup.appendChild(el('circle', { cx, cy, r: R, fill: 'url(#eventGradient)', stroke: '#333333', 'stroke-width': 2.5 }));
+            eventGroup.appendChild(el('circle', { cx, cy, r: R + 8, fill: 'none', stroke: '#f0d800', 'stroke-width': 0.8, 'stroke-opacity': 0.55 }));
 
             // Texto del evento (word-wrap pre-computado, sin truncado)
             const lh = 16, ty0 = cy - ((evLines.length - 1) * lh) / 2;
@@ -1670,8 +1752,10 @@
                 const nodeH = calcNodeH(cause.name);
                 const g = el('g', { style: 'cursor:pointer' });
                 g.addEventListener('click', () => focusBowtieGroup(cause.refId));
-                g.appendChild(el('rect', { x: leftNodeX + 1, y: ncy - nodeH / 2 + 1, width: nodeW, height: nodeH, rx: 6, fill: 'rgba(0,0,0,0.07)' }));
-                g.appendChild(el('rect', { x: leftNodeX, y: ncy - nodeH / 2, width: nodeW, height: nodeH, rx: 6, fill: bg, stroke: color, 'stroke-width': 1.5 }));
+                g.addEventListener('mouseenter', () => { g.style.filter = 'drop-shadow(0 4px 10px rgba(0,0,0,0.18))'; });
+                g.addEventListener('mouseleave', () => { g.style.filter = ''; });
+                g.appendChild(el('rect', { x: leftNodeX + 1, y: ncy - nodeH / 2 + 1, width: nodeW, height: nodeH, rx: 8, fill: 'rgba(0,0,0,0.07)' }));
+                g.appendChild(el('rect', { x: leftNodeX, y: ncy - nodeH / 2, width: nodeW, height: nodeH, rx: 8, fill: bg, stroke: color, 'stroke-width': 1.5 }));
                 g.appendChild(el('rect', { x: leftNodeX, y: ncy - nodeH / 2, width: 6, height: nodeH, rx: 3, fill: color }));
                 const textY0 = ncy - nodeH / 2 + 14;
                 const nt = el('text', { x: leftNodeX + 14, y: textY0, 'font-size': 11, 'font-weight': 600, fill: '#1a1a1a', style: 'pointer-events:none' });
@@ -1692,8 +1776,10 @@
                 const nodeH = calcNodeH(impact.name);
                 const g = el('g', { style: 'cursor:pointer' });
                 g.addEventListener('click', () => focusBowtieGroup(impact.refId));
-                g.appendChild(el('rect', { x: rightNodeX + 1, y: ncy - nodeH / 2 + 1, width: nodeW, height: nodeH, rx: 6, fill: 'rgba(0,0,0,0.07)' }));
-                g.appendChild(el('rect', { x: rightNodeX, y: ncy - nodeH / 2, width: nodeW, height: nodeH, rx: 6, fill: bg, stroke: color, 'stroke-width': 1.5 }));
+                g.addEventListener('mouseenter', () => { g.style.filter = 'drop-shadow(0 4px 10px rgba(0,0,0,0.18))'; });
+                g.addEventListener('mouseleave', () => { g.style.filter = ''; });
+                g.appendChild(el('rect', { x: rightNodeX + 1, y: ncy - nodeH / 2 + 1, width: nodeW, height: nodeH, rx: 8, fill: 'rgba(0,0,0,0.07)' }));
+                g.appendChild(el('rect', { x: rightNodeX, y: ncy - nodeH / 2, width: nodeW, height: nodeH, rx: 8, fill: bg, stroke: color, 'stroke-width': 1.5 }));
                 g.appendChild(el('rect', { x: rightNodeX + nodeW - 6, y: ncy - nodeH / 2, width: 6, height: nodeH, rx: 3, fill: color }));
                 const textY0 = ncy - nodeH / 2 + 14;
                 const nt = el('text', { x: rightNodeX + 10, y: textY0, 'font-size': 11, 'font-weight': 600, fill: '#1a1a1a', style: 'pointer-events:none' });
@@ -1705,6 +1791,11 @@
             });
 
             container.appendChild(svg);
+
+            // Fade-in del SVG al generar
+            svg.style.opacity = '0';
+            svg.style.transition = 'opacity 0.3s ease';
+            requestAnimationFrame(() => requestAnimationFrame(() => { svg.style.opacity = '1'; }));
 
             if (scrollIntoView && document.getElementById('bowtieDiagramVisualization')) {
                 document.getElementById('bowtieDiagramVisualization').scrollIntoView({ behavior: 'smooth' });
@@ -1791,15 +1882,25 @@
             const order = { critical: 0, warning: 1, info: 2, good: 3 };
             alerts.sort((a, b) => (order[a.level] ?? 4) - (order[b.level] ?? 4));
 
+            // Contador resumen de alertas
+            const critCount = alerts.filter(a => a.level === 'critical').length;
+            const warnCount = alerts.filter(a => a.level === 'warning').length;
+            const summaryText = [
+                critCount > 0 ? `${critCount} crítico${critCount > 1 ? 's' : ''}` : '',
+                warnCount > 0 ? `${warnCount} advertencia${warnCount > 1 ? 's' : ''}` : ''
+            ].filter(Boolean).join(' · ') || 'Sin alertas críticas';
+
+            const levelLabel = { critical: 'Crítico', warning: 'Advertencia', info: 'Info', good: 'OK' };
             const alertsHTML = alerts.map(a => `
                 <div class="risk-alert">
-                    <span class="risk-alert-dot ${a.level}"></span>
+                    <span class="risk-alert-pill ${a.level}">${levelLabel[a.level]}</span>
                     <span>${a.html}</span>
                 </div>`).join('');
 
             panel.innerHTML = `
                 <div class="risk-summary-header">
                     <span style="font-size:13px;font-weight:700;color:#333;">Análisis de Riesgo</span>
+                    <span style="font-size:11px;color:#777;font-style:italic;margin-left:4px;">${summaryText}</span>
                     <span style="flex:1"></span>
                     <span class="risk-metric-chip">${causes.length} causa${causes.length !== 1 ? 's' : ''}</span>
                     <span class="risk-metric-chip">${impacts.length} consecuencia${impacts.length !== 1 ? 's' : ''}</span>
