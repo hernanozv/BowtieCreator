@@ -471,15 +471,9 @@
                         </div>
                 </section>
                 <section id="bowtieDiagramVisualization" class="mt-12 p-4 md:p-6 section-card min-h-[400px]">
-                    <div class="grid grid-cols-3 items-center mb-6 border-b pb-2">
-                        <div class="hidden sm:flex items-center gap-3 text-xs text-gray-600" aria-label="Leyenda de efectividad de barreras">
-                            <span class="mr-2 font-medium text-gray-700">Efectividad de la barrera:</span>
-                            <span class="flex items-center"><span class="eff-dot eff-high" aria-hidden="true"></span>Alta</span>
-                            <span class="flex items-center"><span class="eff-dot eff-medium" aria-hidden="true"></span>Media</span>
-                            <span class="flex items-center"><span class="eff-dot eff-low" aria-hidden="true"></span>Baja</span>
-                        </div>
-                        <h2 class="text-2xl font-semibold text-center section-title">Diagrama Bow-Tie</h2>
-                        <div class="text-right">
+                    <div class="flex items-center justify-between mb-6 border-b pb-2">
+                        <h2 class="text-2xl font-semibold section-title">Diagrama Bow-Tie</h2>
+                        <div>
                             <button type="button" data-export-ignore="true" onclick="exportBowtieDiagramImage()" class="action-button action-button-secondary">
                                 Exportar Diagrama
                             </button>
@@ -489,22 +483,24 @@
                     <!-- Panel de resumen de riesgo -->
                     <div id="bowtieRiskSummary"></div>
                     <!-- Leyenda consolidada -->
-                    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600 mt-4 pt-3 border-t border-gray-100" aria-label="Leyenda del diagrama">
-                        <span class="font-semibold text-gray-700">Barreras:</span>
-                        <span class="flex items-center gap-1"><span class="eff-dot eff-high" aria-hidden="true"></span>Alta efectividad</span>
-                        <span class="flex items-center gap-1"><span class="eff-dot eff-medium" aria-hidden="true"></span>Media efectividad</span>
-                        <span class="flex items-center gap-1"><span class="eff-dot eff-low" aria-hidden="true"></span>Baja efectividad</span>
-                        <span class="text-gray-300 hidden sm:inline">|</span>
-                        <span class="font-semibold text-gray-700">Riesgo del path:</span>
-                        <span class="flex items-center gap-1"><span style="display:inline-block;width:22px;height:3px;background:#52c41a;border-radius:2px;" aria-hidden="true"></span>Bajo</span>
-                        <span class="flex items-center gap-1"><span style="display:inline-block;width:22px;height:3px;background:#ff7a00;border-radius:2px;" aria-hidden="true"></span>Medio</span>
-                        <span class="flex items-center gap-1"><span style="display:inline-block;width:22px;height:3px;background:#f5222d;border-radius:2px;" aria-hidden="true"></span>Alto</span>
-                        <span class="text-gray-300 hidden sm:inline">|</span>
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-gray-600 mt-4 pt-3 border-t border-gray-100" aria-label="Leyenda del diagrama">
+                        <span class="font-semibold text-gray-700">Efectividad barrera:</span>
+                        <span class="flex items-center gap-1"><span class="eff-dot eff-high" aria-hidden="true"></span>Alta</span>
+                        <span class="flex items-center gap-1"><span class="eff-dot eff-medium" aria-hidden="true"></span>Media</span>
+                        <span class="flex items-center gap-1"><span class="eff-dot eff-low" aria-hidden="true"></span>Baja</span>
+                        <span class="text-gray-300 mx-1">|</span>
+                        <span class="font-semibold text-gray-700">Riesgo path:</span>
+                        <span class="flex items-center gap-1"><span style="display:inline-block;width:20px;height:3px;background:#52c41a;border-radius:2px;" aria-hidden="true"></span>Bajo</span>
+                        <span class="flex items-center gap-1"><span style="display:inline-block;width:20px;height:3px;background:#ff7a00;border-radius:2px;" aria-hidden="true"></span>Medio</span>
+                        <span class="flex items-center gap-1"><span style="display:inline-block;width:20px;height:3px;background:#f5222d;border-radius:2px;" aria-hidden="true"></span>Alto</span>
+                        <span class="text-gray-300 mx-1">|</span>
+                        <span class="font-semibold text-gray-700">Prob. causa:</span>
                         <span class="flex items-center gap-1"><span class="legend-swatch prob-improbable" aria-hidden="true"></span>Improbable</span>
                         <span class="flex items-center gap-1"><span class="legend-swatch prob-posible" aria-hidden="true"></span>Posible</span>
                         <span class="flex items-center gap-1"><span class="legend-swatch prob-probable" aria-hidden="true"></span>Probable</span>
                         <span class="flex items-center gap-1"><span class="legend-swatch prob-altamente" aria-hidden="true"></span>Alt. probable</span>
-                        <span class="text-gray-300 hidden sm:inline">|</span>
+                        <span class="text-gray-300 mx-1">|</span>
+                        <span class="font-semibold text-gray-700">Impacto consec.:</span>
                         <span class="flex items-center gap-1"><span class="legend-swatch impact-minor" aria-hidden="true"></span>Menor</span>
                         <span class="flex items-center gap-1"><span class="legend-swatch impact-moderate" aria-hidden="true"></span>Moderado</span>
                         <span class="flex items-center gap-1"><span class="legend-swatch impact-high" aria-hidden="true"></span>Alto</span>
