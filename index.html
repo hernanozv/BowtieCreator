@@ -457,6 +457,7 @@
         <header class="text-center mb-6 py-4 corp-header">
             <h1 class="text-3xl md:text-4xl font-bold corp-title">Análisis de Riesgos</h1>
             <p class="corp-subtitle mt-2">Herramienta para Diagramas BowTie y Árboles de Fallos</p>
+            <span id="autosaveIndicator" style="display:block;font-size:11px;color:#999;margin-top:4px;min-height:16px;transition:opacity 1s;opacity:0.5;"></span>
         </header>
 
         <div class="flex flex-col sm:flex-row flex-wrap justify-center items-center space-y-3 sm:space-y-0 sm:space-x-3 mb-8 pb-4 border-b border-gray-200">
@@ -472,6 +473,9 @@
             <input type="file" id="importFile" class="hidden" accept=".xlsx, .xls" onchange="handleCurrentFileImport(event)">
             <button onclick="confirmCurrentReset()" class="action-button action-button-danger">
                 Reiniciar Análisis
+            </button>
+            <button onclick="toggleKeyboardShortcutsOverlay()" class="action-button action-button-secondary" title="Atajos de teclado">
+                ?
             </button>
         </div>
 
@@ -833,7 +837,9 @@
         }
         const debouncedRenderBowTie = debounce(() => {
             if (activeTab === 'bowtie') {
-                renderBowTieDiagram(false); // no desplazar al diagrama durante auto-actualización
+                renderBowTieDiagram(false);
+                if (typeof autoSaveBowtieState === 'function') autoSaveBowtieState();
+                if (typeof updateBarriersWarnings === 'function') updateBarriersWarnings();
             }
         }, 300);
         // Entradas que deben refrescar el diagrama al escribir
@@ -1760,6 +1766,12 @@
                 g.appendChild(nt);
                 const pl = txt(label, { x: leftNodeX + 14, y: ncy + nodeH / 2 - 9, 'font-size': 9, fill: color, style: 'pointer-events:none' });
                 g.appendChild(pl);
+                // Badge: conteo de barreras (esquina superior derecha del nodo)
+                const bCount = cause.barriers.length;
+                const badgeColor = cause.barriers.some(b => b.eff === 'high') ? '#16a34a' : cause.barriers.some(b => b.eff === 'medium') ? '#f59e0b' : bCount > 0 ? '#dc2626' : '#9ca3af';
+                g.appendChild(el('circle', { cx: leftNodeX + nodeW - 11, cy: ncy - nodeH / 2 + 11, r: 9, fill: badgeColor, style: 'pointer-events:none' }));
+                const bt = el('text', { x: leftNodeX + nodeW - 11, y: ncy - nodeH / 2 + 15, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 700, fill: '#fff', style: 'pointer-events:none' });
+                bt.textContent = String(bCount); g.appendChild(bt);
                 svg.appendChild(g);
             });
 
@@ -1784,6 +1796,12 @@
                 g.appendChild(nt);
                 const sl = txt(label, { x: rightNodeX + 10, y: ncy + nodeH / 2 - 9, 'font-size': 9, fill: color, style: 'pointer-events:none' });
                 g.appendChild(sl);
+                // Badge: conteo de barreras (esquina superior izquierda del nodo consecuencia)
+                const bCount = impact.barriers.length;
+                const badgeColor = impact.barriers.some(b => b.eff === 'high') ? '#16a34a' : impact.barriers.some(b => b.eff === 'medium') ? '#f59e0b' : bCount > 0 ? '#dc2626' : '#9ca3af';
+                g.appendChild(el('circle', { cx: rightNodeX + 11, cy: ncy - nodeH / 2 + 11, r: 9, fill: badgeColor, style: 'pointer-events:none' }));
+                const bt = el('text', { x: rightNodeX + 11, y: ncy - nodeH / 2 + 15, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 700, fill: '#fff', style: 'pointer-events:none' });
+                bt.textContent = String(bCount); g.appendChild(bt);
                 svg.appendChild(g);
             });
 
@@ -2346,6 +2364,10 @@
             if (typeof closeAnyOpenBarrierPicker === 'function') closeAnyOpenBarrierPicker();
             if (typeof barrierRegistryAll !== 'undefined') barrierRegistryAll.clear();
             if (typeof barrierIdCounterAll !== 'undefined') barrierIdCounterAll = 0;
+            // Limpiar auto-guardado
+            try { localStorage.removeItem('bowtie_autosave'); } catch(e) {}
+            const ind = document.getElementById('autosaveIndicator');
+            if (ind) ind.textContent = '';
         }
 
         function executeResetFtaAnalysis() {
@@ -2364,6 +2386,7 @@
         
         function exportCurrentAnalysis() {
             if (activeTab === 'bowtie') {
+                if (typeof validateBowtieInputs === 'function') validateBowtieInputs();
                 exportBowTieToXLSX();
             } else if (activeTab === 'fta') {
                 exportFtaToXLSX();
@@ -2596,6 +2619,244 @@
                 renderFtaDiagram();
             }
         }
+
+        // =====================================================================
+        // FASE 1: D11 — Auto-guardado en localStorage
+        // =====================================================================
+        function serializeBowtieState() {
+            const state = { riskEvent: document.getElementById('riskEvent').value, causes: [], impacts: [] };
+            document.querySelectorAll('.cause-input-group').forEach(group => {
+                const name = (group.querySelector('.cause-name-input') || {}).value || '';
+                const prob = (group.querySelector('.cause-probability') || {}).value || 'posible';
+                const barriers = [];
+                group.querySelectorAll('.barrier-input-item').forEach(item => {
+                    const inp = item.querySelector('.preventive-barrier-input');
+                    if (inp) barriers.push({ text: inp.value, eff: (item.querySelector('.barrier-effectiveness') || {}).value || 'medium', barrierId: inp.dataset.barrierId || '' });
+                });
+                state.causes.push({ name, prob, barriers });
+            });
+            document.querySelectorAll('.impact-input-group').forEach(group => {
+                const name = (group.querySelector('.impact-name-input') || {}).value || '';
+                const sev = (group.querySelector('.impact-severity') || {}).value || 'moderado';
+                const barriers = [];
+                group.querySelectorAll('.barrier-input-item').forEach(item => {
+                    const inp = item.querySelector('.mitigative-barrier-input');
+                    if (inp) barriers.push({ text: inp.value, eff: (item.querySelector('.barrier-effectiveness') || {}).value || 'medium', barrierId: inp.dataset.barrierId || '' });
+                });
+                state.impacts.push({ name, sev, barriers });
+            });
+            return state;
+        }
+
+        function deserializeBowtieState(state) {
+            if (!state) return;
+            // Reset silently (no localStorage clear)
+            document.getElementById('riskEvent').value = '';
+            document.getElementById('causesContainer').innerHTML = '';
+            document.getElementById('impactsContainer').innerHTML = '';
+            causeCounter = 0; impactCounter = 0;
+            if (typeof barrierRegistryAll !== 'undefined') barrierRegistryAll.clear();
+            if (typeof barrierIdCounterAll !== 'undefined') barrierIdCounterAll = 0;
+
+            document.getElementById('riskEvent').value = state.riskEvent || '';
+            const probMap = { improbable: 1, posible: 2, probable: 3, altamente: 4 };
+            const sevMap  = { menor: 1, moderado: 2, alto: 3, catastrofico: 4 };
+            (state.causes || []).forEach(c => {
+                const div = addCauseInput();
+                if (!div) return;
+                const ni = div.querySelector('.cause-name-input');
+                if (ni) ni.value = c.name || '';
+                const sl = div.querySelector('.cause-probability-slider');
+                if (sl) { sl.value = probMap[c.prob] || 2; updateCauseProbabilitySlider(sl); }
+                (c.barriers || []).forEach(b => {
+                    const inp = addPreventiveBarrierInput(div.id);
+                    if (!inp) return;
+                    inp.value = b.text || '';
+                    inp.style.background = b.eff === 'high' ? 'rgba(22,163,74,0.08)' : b.eff === 'low' ? 'rgba(220,38,38,0.08)' : 'rgba(245,158,11,0.08)';
+                    const effSel = inp.closest('.barrier-input-item') && inp.closest('.barrier-input-item').querySelector('.barrier-effectiveness');
+                    if (effSel) effSel.value = b.eff || 'medium';
+                    if (b.barrierId) { inp.dataset.barrierId = b.barrierId; if (!barrierRegistryAll.has(b.barrierId)) barrierRegistryAll.set(b.barrierId, { id: b.barrierId, text: b.text || '', eff: b.eff || 'medium' }); }
+                });
+            });
+            (state.impacts || []).forEach(imp => {
+                const div = addImpactInput();
+                if (!div) return;
+                const ni = div.querySelector('.impact-name-input');
+                if (ni) ni.value = imp.name || '';
+                const sl = div.querySelector('.cause-probability-slider');
+                if (sl) { sl.value = sevMap[imp.sev] || 2; updateImpactSeveritySlider(sl); }
+                (imp.barriers || []).forEach(b => {
+                    const inp = addMitigativeBarrierInput(div.id);
+                    if (!inp) return;
+                    inp.value = b.text || '';
+                    inp.style.background = b.eff === 'high' ? 'rgba(22,163,74,0.08)' : b.eff === 'low' ? 'rgba(220,38,38,0.08)' : 'rgba(245,158,11,0.08)';
+                    const effSel = inp.closest('.barrier-input-item') && inp.closest('.barrier-input-item').querySelector('.barrier-effectiveness');
+                    if (effSel) effSel.value = b.eff || 'medium';
+                    if (b.barrierId) { inp.dataset.barrierId = b.barrierId; if (!barrierRegistryAll.has(b.barrierId)) barrierRegistryAll.set(b.barrierId, { id: b.barrierId, text: b.text || '', eff: b.eff || 'medium' }); }
+                });
+            });
+            renderBowTieDiagram(false);
+        }
+
+        function autoSaveBowtieState() {
+            try {
+                localStorage.setItem('bowtie_autosave', JSON.stringify(serializeBowtieState()));
+                const ind = document.getElementById('autosaveIndicator');
+                if (ind) {
+                    const t = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+                    ind.textContent = `✓ Guardado automáticamente a las ${t}`;
+                    ind.style.opacity = '1';
+                    clearTimeout(ind._t);
+                    ind._t = setTimeout(() => { ind.style.opacity = '0.4'; }, 2500);
+                }
+            } catch(e) {}
+        }
+
+        // =====================================================================
+        // FASE 1: A1 — Validación de completitud + toast global
+        // =====================================================================
+        function showToastMessage(msg, type) {
+            let toast = document.getElementById('globalToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'globalToast';
+                toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:9999;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 4px 18px rgba(0,0,0,0.15);transition:opacity 0.4s;pointer-events:none;white-space:nowrap;';
+                document.body.appendChild(toast);
+            }
+            const bg  = { info:'#f5f5f5', warning:'#fff7ed', success:'#dcfce7', error:'#fee2e2' };
+            const col = { info:'#333', warning:'#9a3412', success:'#166534', error:'#991b1b' };
+            const brd = { info:'#e5e7eb', warning:'#fdba74', success:'#86efac', error:'#fca5a5' };
+            toast.style.background = bg[type] || bg.info;
+            toast.style.color = col[type] || col.info;
+            toast.style.border = `1px solid ${brd[type] || brd.info}`;
+            toast.textContent = msg;
+            toast.style.opacity = '1';
+            clearTimeout(toast._t);
+            toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 3500);
+        }
+
+        function validateBowtieInputs() {
+            let n = 0;
+            document.querySelectorAll('.validation-error-ring').forEach(el => el.classList.remove('validation-error-ring', 'ring-2', 'ring-red-400'));
+            const mark = el => { el.classList.add('validation-error-ring', 'ring-2', 'ring-red-400'); n++; };
+            const re = document.getElementById('riskEvent');
+            if (re && !re.value.trim()) mark(re);
+            document.querySelectorAll('.cause-name-input, .impact-name-input').forEach(el => { if (!el.value.trim()) mark(el); });
+            document.querySelectorAll('.preventive-barrier-input, .mitigative-barrier-input').forEach(el => { if (!el.value.trim()) mark(el); });
+            if (n > 0) showToastMessage(`${n} campo${n > 1 ? 's' : ''} incompleto${n > 1 ? 's' : ''} detectado${n > 1 ? 's' : ''}`, 'warning');
+            return n === 0;
+        }
+
+        // =====================================================================
+        // FASE 1: A3 — Indicador de cobertura mínima inline
+        // =====================================================================
+        function updateBarriersWarnings() {
+            document.querySelectorAll('.cause-input-group').forEach(group => {
+                const count = group.querySelectorAll('.preventive-barriers-container .barrier-input-item').length;
+                let chip = group.querySelector('.no-barriers-chip');
+                if (count === 0) {
+                    if (!chip) {
+                        chip = document.createElement('div');
+                        chip.className = 'no-barriers-chip text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 border-dashed rounded-md px-2 py-1 mt-2';
+                        chip.textContent = '⚠ Sin barreras preventivas';
+                        const sec = group.querySelector('.mt-3');
+                        if (sec) sec.insertAdjacentElement('beforebegin', chip); else group.appendChild(chip);
+                    }
+                    chip.style.display = '';
+                } else {
+                    if (chip) chip.style.display = 'none';
+                }
+            });
+            document.querySelectorAll('.impact-input-group').forEach(group => {
+                const count = group.querySelectorAll('.mitigative-barriers-container .barrier-input-item').length;
+                let chip = group.querySelector('.no-barriers-chip');
+                if (count === 0) {
+                    if (!chip) {
+                        chip = document.createElement('div');
+                        chip.className = 'no-barriers-chip text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 border-dashed rounded-md px-2 py-1 mt-2';
+                        chip.textContent = '⚠ Sin barreras mitigantes';
+                        const sec = group.querySelector('.mt-3');
+                        if (sec) sec.insertAdjacentElement('beforebegin', chip); else group.appendChild(chip);
+                    }
+                    chip.style.display = '';
+                } else {
+                    if (chip) chip.style.display = 'none';
+                }
+            });
+        }
+
+        // =====================================================================
+        // FASE 1: D14 — Atajos de teclado
+        // =====================================================================
+        document.addEventListener('keydown', function(e) {
+            const tag = document.activeElement && document.activeElement.tagName;
+            const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+            if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+                e.preventDefault(); if (activeTab === 'bowtie') addCauseInput();
+            } else if (e.ctrlKey && e.shiftKey && e.key === 'I') {
+                e.preventDefault(); if (activeTab === 'bowtie') addImpactInput();
+            } else if (e.ctrlKey && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                if (activeTab === 'bowtie') {
+                    const f = document.activeElement;
+                    const cg = f && f.closest('.cause-input-group');
+                    const ig = f && f.closest('.impact-input-group');
+                    if (cg) addPreventiveBarrierInput(cg.id);
+                    else if (ig) addMitigativeBarrierInput(ig.id);
+                    else showToastMessage('Haz clic en una causa o consecuencia primero', 'info');
+                }
+            } else if (e.ctrlKey && e.key === 's') {
+                e.preventDefault(); exportCurrentAnalysis();
+            } else if (!isTyping && e.key === '?') {
+                toggleKeyboardShortcutsOverlay();
+            } else if (e.key === 'Escape') {
+                const ov = document.getElementById('keyboardShortcutsOverlay');
+                if (ov && ov.style.display !== 'none') ov.style.display = 'none';
+            }
+        });
+
+        function toggleKeyboardShortcutsOverlay() {
+            let ov = document.getElementById('keyboardShortcutsOverlay');
+            if (!ov) {
+                ov = document.createElement('div');
+                ov.id = 'keyboardShortcutsOverlay';
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:10000;display:flex;align-items:center;justify-content:center;';
+                ov.innerHTML = `<div style="background:#fff;border-radius:12px;padding:28px 36px;max-width:420px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,0.2);">
+                  <h3 style="font-size:16px;font-weight:700;color:#333;margin-bottom:16px;border-bottom:3px solid #FFF159;padding-bottom:8px;">⌨ Atajos de Teclado</h3>
+                  <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                    <tr><td style="padding:7px 0;color:#666;font-family:monospace;font-size:12px;">Ctrl + Shift + C</td><td style="padding:7px 0;font-weight:600;color:#333;">Nueva Causa</td></tr>
+                    <tr style="background:#fafafa;"><td style="padding:7px 4px;color:#666;font-family:monospace;font-size:12px;">Ctrl + Shift + I</td><td style="padding:7px 4px;font-weight:600;color:#333;">Nueva Consecuencia</td></tr>
+                    <tr><td style="padding:7px 0;color:#666;font-family:monospace;font-size:12px;">Ctrl + Shift + B</td><td style="padding:7px 0;font-weight:600;color:#333;">Nueva Barrera (en grupo activo)</td></tr>
+                    <tr style="background:#fafafa;"><td style="padding:7px 4px;color:#666;font-family:monospace;font-size:12px;">Ctrl + S</td><td style="padding:7px 4px;font-weight:600;color:#333;">Exportar XLSX</td></tr>
+                    <tr><td style="padding:7px 0;color:#666;font-family:monospace;font-size:12px;">?</td><td style="padding:7px 0;font-weight:600;color:#333;">Mostrar/ocultar este panel</td></tr>
+                    <tr style="background:#fafafa;"><td style="padding:7px 4px;color:#666;font-family:monospace;font-size:12px;">Esc</td><td style="padding:7px 4px;font-weight:600;color:#333;">Cerrar panel</td></tr>
+                  </table>
+                  <button onclick="document.getElementById('keyboardShortcutsOverlay').style.display='none'" style="margin-top:18px;width:100%;padding:9px;background:#FFF159;border:1px solid #f0d800;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;">Cerrar</button>
+                </div>`;
+                ov.addEventListener('click', e => { if (e.target === ov) ov.style.display = 'none'; });
+                document.body.appendChild(ov);
+            } else {
+                ov.style.display = ov.style.display === 'none' ? 'flex' : 'none';
+            }
+        }
+
+        // =====================================================================
+        // Restaurar estado guardado al cargar la página
+        // =====================================================================
+        (function() {
+            try {
+                const saved = localStorage.getItem('bowtie_autosave');
+                if (saved) {
+                    const state = JSON.parse(saved);
+                    if (state && (state.riskEvent || (state.causes && state.causes.length) || (state.impacts && state.impacts.length))) {
+                        deserializeBowtieState(state);
+                        const ind = document.getElementById('autosaveIndicator');
+                        if (ind) { ind.textContent = '✓ Análisis restaurado automáticamente'; ind.style.opacity = '1'; setTimeout(() => { ind.style.opacity = '0.4'; }, 3500); }
+                    }
+                }
+            } catch(e) {}
+        })();
+
     </script>
 </body>
 </html>
