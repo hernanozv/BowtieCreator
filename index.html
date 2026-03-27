@@ -449,6 +449,24 @@
         #bowtieDiagramVisualization.exporting #bowtieDiagram svg {
           shape-rendering: geometricPrecision !important;
         }
+        /* =====================================================================
+           E15: Estilos de impresión para exportar PDF
+           ===================================================================== */
+        @media print {
+            body { background: #fff !important; }
+            header, .flex.flex-col.sm\\:flex-row, #analysisTabs,
+            #causesContainer, #impactsContainer,
+            .cause-input-group, .impact-input-group,
+            #ftaContent, #bowtieRiskSummary .fase2-criticality-body,
+            button, label, input[type=file], #globalToast,
+            #keyboardShortcutsOverlay, .no-barriers-chip,
+            #autosaveIndicator { display: none !important; }
+            #bowtieContent { display: block !important; }
+            #bowtieDiagramVisualization { page-break-inside: avoid; }
+            #bowtieRiskSummary { page-break-inside: avoid; border: 1px solid #e5e7eb !important; }
+            .risk-summary-header button { display: none !important; }
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -464,8 +482,17 @@
             <button id="generateBtn" onclick="generateCurrentDiagram()" class="action-button action-button-primary">
                 ⟳ Generar/Actualizar Diagrama
             </button>
+            <button id="undoBtn" onclick="undoBowtie()" class="action-button action-button-secondary" title="Deshacer (Ctrl+Z)" disabled>
+                ↩ Deshacer
+            </button>
+            <button id="redoBtn" onclick="redoBowtie()" class="action-button action-button-secondary" title="Rehacer (Ctrl+Y)" disabled>
+                ↪ Rehacer
+            </button>
             <button onclick="exportCurrentAnalysis()" class="action-button action-button-secondary">
-                ↓ Exportar
+                ↓ Exportar XLSX
+            </button>
+            <button onclick="exportPDF()" class="action-button action-button-secondary" title="Exportar a PDF mediante impresión del navegador">
+                ⎙ Exportar PDF
             </button>
             <label for="importFile" class="action-button action-button-secondary cursor-pointer">
                 ↑ Importar
@@ -517,7 +544,10 @@
                 <section id="bowtieDiagramVisualization" class="mt-12 p-4 md:p-6 section-card min-h-[400px]">
                     <div class="flex items-center justify-between mb-6 border-b pb-2">
                         <h2 class="text-2xl font-semibold section-title">Diagrama Bow-Tie</h2>
-                        <div>
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <button type="button" id="heatmapToggleBtn" data-export-ignore="true" onclick="heatmapModeActive=!heatmapModeActive;renderBowTieDiagram(false);this.style.background=heatmapModeActive?'#fef9c3':'';this.style.borderColor=heatmapModeActive?'#f59e0b':'';" class="action-button action-button-secondary" title="Colorear nodos según nivel de riesgo inherente">
+                                ◉ Heatmap
+                            </button>
                             <button type="button" data-export-ignore="true" onclick="exportBowtieDiagramImage()" class="action-button action-button-secondary">
                                 Exportar Diagrama
                             </button>
@@ -629,7 +659,13 @@
             fta: document.getElementById('ftaContent')
         };
         let activeTab = 'bowtie';
-        let residualModeActive = false; // B5: toggle inherente/residual 
+        let residualModeActive = false; // B5: toggle inherente/residual
+        let heatmapModeActive = false;  // C9: heatmap de riesgo en nodos SVG
+        // D12: Undo/Redo
+        let undoStack = [], redoStack = [], _undoRestoring = false;
+        const UNDO_MAX = 30;
+        // B7: último estado renderizado (para modal de deep dive)
+        let _lastRenderState = { causes: [], impacts: [], riskEventName: '' }; 
 
         function showTab(tabId) {
             activeTab = tabId;
@@ -841,6 +877,7 @@
                 renderBowTieDiagram(false);
                 if (typeof autoSaveBowtieState === 'function') autoSaveBowtieState();
                 if (typeof updateBarriersWarnings === 'function') updateBarriersWarnings();
+                if (typeof pushUndoSnapshot === 'function') pushUndoSnapshot();
             }
         }, 300);
         // Entradas que deben refrescar el diagrama al escribir
@@ -1403,7 +1440,8 @@
                 impacts.push({ name, severity, barriers, refId: group.id });
             });
 
-            // --- Actualizar panel de resumen ---
+            // --- Guardar estado para modales y actualizar panel de resumen ---
+            _lastRenderState = { causes, impacts, riskEventName };
             renderRiskSummary(causes, impacts, riskEventName);
 
             // --- Contenedor ---
@@ -1750,16 +1788,26 @@
             eventGroup.appendChild(evTxt);
             svg.appendChild(eventGroup);
 
+            // C9: Heatmap — calcula background de nodo según score de riesgo
+            function heatmapNodeBg(score) {
+                // score: 1..16 → de verde claro a rojo
+                if (score >= 12) return '#fecaca'; // rojo
+                if (score >= 8)  return '#fed7aa'; // naranja
+                if (score >= 4)  return '#fef08a'; // amarillo
+                return '#d1fae5';                  // verde
+            }
+
             // --- Nodos de causa ---
             causes.forEach((cause, i) => {
                 const ncy = getNodeCY(i, causes.length);
                 const color = probColors[cause.prob] || '#faad14';
-                const bg = probBg[cause.prob] || '#fffbe6';
+                const pScore = probScores[cause.prob] || 2;
+                const bg = heatmapModeActive ? heatmapNodeBg(pScore * pScore) : (probBg[cause.prob] || '#fffbe6');
                 const label = probLabels[cause.prob] || cause.prob;
                 const nameLines = wrapSvgText(cause.name, 18, 4);
                 const nodeH = calcNodeH(cause.name);
                 const g = el('g', { style: 'cursor:pointer' });
-                g.addEventListener('click', () => focusBowtieGroup(cause.refId));
+                g.addEventListener('click', () => openDeepDiveModal('cause', cause.refId));
                 g.addEventListener('mouseenter', () => { g.style.filter = 'drop-shadow(0 4px 10px rgba(0,0,0,0.18))'; });
                 g.addEventListener('mouseleave', () => { g.style.filter = ''; });
                 g.appendChild(el('rect', { x: leftNodeX + 1, y: ncy - nodeH / 2 + 1, width: nodeW, height: nodeH, rx: 8, fill: 'rgba(0,0,0,0.07)' }));
@@ -1784,12 +1832,13 @@
             impacts.forEach((impact, i) => {
                 const ncy = getNodeCY(i, impacts.length);
                 const color = sevColors[impact.severity] || '#faad14';
-                const bg = sevBg[impact.severity] || '#fffbe6';
+                const sScore = sevScores[impact.severity] || 2;
+                const bg = heatmapModeActive ? heatmapNodeBg(sScore * sScore) : (sevBg[impact.severity] || '#fffbe6');
                 const label = sevLabels[impact.severity] || impact.severity;
                 const nameLines = wrapSvgText(impact.name, 18, 4);
                 const nodeH = calcNodeH(impact.name);
                 const g = el('g', { style: 'cursor:pointer' });
-                g.addEventListener('click', () => focusBowtieGroup(impact.refId));
+                g.addEventListener('click', () => openDeepDiveModal('impact', impact.refId));
                 g.addEventListener('mouseenter', () => { g.style.filter = 'drop-shadow(0 4px 10px rgba(0,0,0,0.18))'; });
                 g.addEventListener('mouseleave', () => { g.style.filter = ''; });
                 g.appendChild(el('rect', { x: rightNodeX + 1, y: ncy - nodeH / 2 + 1, width: nodeW, height: nodeH, rx: 8, fill: 'rgba(0,0,0,0.07)' }));
@@ -1963,6 +2012,40 @@
                 alerts.push({ level: lvl, html: `Path más crítico: <strong>"${maxPath.cause.name}"</strong> → ${riskEventName} → <strong>"${maxPath.impact.name}"</strong> — Riesgo: <strong>${scoreLabel} (${maxScore}/16)</strong>` });
             }
 
+            // A2: Detección de barreras duplicadas (mismo texto, case-insensitive)
+            const allBarrierTexts = [];
+            [...causes, ...impacts].forEach(node => {
+                node.barriers.forEach(b => {
+                    const t = (b.text || '').trim().toLowerCase();
+                    if (t) allBarrierTexts.push(t);
+                });
+            });
+            const seen = {}, dupes = new Set();
+            allBarrierTexts.forEach(t => { if (seen[t]) dupes.add(t); seen[t] = true; });
+            if (dupes.size > 0) {
+                dupes.forEach(t => alerts.push({ level: 'warning', html: `Barrera duplicada detectada: <strong>"${t}"</strong> aparece en más de un nodo.` }));
+            }
+
+            // F20: Rendimiento decreciente de barreras (redundancia)
+            [...causes, ...impacts].forEach(node => {
+                if (node.barriers.length < 2) return;
+                const effMap = { high: 0.8, medium: 0.5, low: 0.2 };
+                // Calcular contribución marginal de la última barrera
+                const sorted = [...node.barriers].sort((a, b) => (effMap[b.eff] || 0.2) - (effMap[a.eff] || 0.2));
+                let remaining = 1;
+                const marginals = sorted.map(b => {
+                    const reduction = remaining * (effMap[b.eff] || 0.2);
+                    remaining *= (1 - (effMap[b.eff] || 0.2));
+                    return reduction;
+                });
+                const lastMarginal = marginals[marginals.length - 1];
+                const totalReduction = 1 - remaining;
+                if (totalReduction > 0 && lastMarginal / totalReduction < 0.05) {
+                    const nodeName = node.name || '(nodo)';
+                    alerts.push({ level: 'info', html: `Rendimiento decreciente en <strong>"${nodeName}"</strong>: la barrera de menor efectividad aporta menos del 5% de la reducción total (posible redundancia).` });
+                }
+            });
+
             // 8. Situaciones favorables
             if (causes.length > 0 && causes.every(c => c.barriers.length > 0 && c.barriers.some(b => b.eff === 'high'))) {
                 alerts.push({ level: 'good', html: 'Todas las causas tienen al menos una barrera preventiva de alta efectividad.' });
@@ -2020,16 +2103,86 @@
                 });
             }
 
+            // C10: Mini-matrix — posición de cada causa/consecuencia en grilla 4x4
+            // Construir celdas marcadas con puntos de colores por tipo (causa=azul, consecuencia=violeta)
+            function miniMatrixBg(p, s) {
+                const sc = p * s;
+                if (sc >= 12) return '#fca5a5';
+                if (sc >= 8)  return '#fdba74';
+                if (sc >= 4)  return '#fef08a';
+                return '#bbf7d0';
+            }
+            const mmCellSize = 18;
+            const mmLabels = { prob: ['I','P','Pr','A'], sev: ['Me','Mo','Al','C'] };
+            let mmRows = '';
+            for (let pi = 3; pi >= 0; pi--) {
+                let row = `<td style="font-size:8px;color:#aaa;padding-right:2px;text-align:right;">${mmLabels.prob[pi]}</td>`;
+                for (let si = 0; si < 4; si++) {
+                    const bg = miniMatrixBg(pi + 1, si + 1);
+                    const causeDots = causes.filter(c => (probScores[c.prob] || 2) === pi + 1).map(() => `<circle r="3.5" fill="#3b82f6" opacity="0.85"/>`).join('');
+                    const impactDots = impacts.filter(i => (sevScores[i.severity] || 2) === si + 1 && (probScores['altamente'] || 4) === pi + 1).map(() => '').join('');
+                    // For causes: plot where prob matches row; for impacts: use their sev vs a representative row
+                    const hasCause = causes.some(c => (probScores[c.prob] || 2) === pi + 1);
+                    const hasImpact = impacts.some(i => (sevScores[i.severity] || 2) === si + 1);
+                    // We want: blue dot if any cause has this prob; purple dot if any impact has this sev
+                    // They're orthogonal dimensions so just overlay
+                    let dots = '';
+                    if (hasCause && hasImpact) dots = `<circle cx="5" cy="9" r="3.5" fill="#3b82f6" opacity="0.9"/><circle cx="13" cy="9" r="3.5" fill="#7c3aed" opacity="0.9"/>`;
+                    else if (hasCause) dots = `<circle cx="9" cy="9" r="3.5" fill="#3b82f6" opacity="0.9"/>`;
+                    else if (hasImpact) dots = `<circle cx="9" cy="9" r="3.5" fill="#7c3aed" opacity="0.9"/>`;
+                    row += `<td style="padding:1px;"><svg width="${mmCellSize}" height="${mmCellSize}" style="display:block;"><rect width="${mmCellSize}" height="${mmCellSize}" rx="2" fill="${bg}"/>${dots}</svg></td>`;
+                }
+                mmRows += `<tr>${row}</tr>`;
+            }
+            let mmHeaderRow = `<td></td>${mmLabels.sev.map(l => `<td style="font-size:8px;color:#aaa;text-align:center;">${l}</td>`).join('')}`;
+            const miniMatrixHTML = `<table style="border-collapse:collapse;"><thead><tr>${mmHeaderRow}</tr></thead><tbody>${mmRows}</tbody></table>
+                <div style="display:flex;gap:8px;margin-top:3px;">
+                    <span style="font-size:9px;color:#666;display:flex;align-items:center;gap:3px;"><svg width="8" height="8"><circle cx="4" cy="4" r="3.5" fill="#3b82f6"/></svg>Causa</span>
+                    <span style="font-size:9px;color:#666;display:flex;align-items:center;gap:3px;"><svg width="8" height="8"><circle cx="4" cy="4" r="3.5" fill="#7c3aed"/></svg>Consecuencia</span>
+                </div>`;
+
+            // F18: What-If — BPEI si todas las barreras bajas fueran subidas a media
+            const whatIfBpei = (() => {
+                const upgradedCauses = causes.map(c => ({ ...c, barriers: c.barriers.map(b => ({ ...b, eff: b.eff === 'low' ? 'medium' : b.eff })) }));
+                const upgradedImpacts = impacts.map(i => ({ ...i, barriers: i.barriers.map(b => ({ ...b, eff: b.eff === 'low' ? 'medium' : b.eff })) }));
+                return calcBPEI(upgradedCauses, upgradedImpacts);
+            })();
+            const whatIfBpeiHigh = (() => {
+                const upgradedCauses = causes.map(c => ({ ...c, barriers: c.barriers.map(b => ({ ...b, eff: 'high' })) }));
+                const upgradedImpacts = impacts.map(i => ({ ...i, barriers: i.barriers.map(b => ({ ...b, eff: 'high' })) }));
+                return calcBPEI(upgradedCauses, upgradedImpacts);
+            })();
+            const lowCount = [...causes, ...impacts].flatMap(n => n.barriers).filter(b => b.eff === 'low').length;
+            const whatIfHTML = `
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;">
+                    <div style="flex:1;min-width:120px;background:#f8f8f8;border-radius:6px;padding:8px 10px;">
+                        <div style="font-size:9px;color:#999;margin-bottom:2px;">BPEI Actual</div>
+                        <div style="font-size:18px;font-weight:800;color:${bpeiColor};">${bpei}%</div>
+                    </div>
+                    ${lowCount > 0 ? `<div style="flex:1;min-width:120px;background:#fef9c3;border-radius:6px;padding:8px 10px;">
+                        <div style="font-size:9px;color:#92400e;margin-bottom:2px;">Si bajas → medias (${lowCount})</div>
+                        <div style="font-size:18px;font-weight:800;color:#92400e;">${whatIfBpei}%</div>
+                        <div style="font-size:9px;color:#b45309;">+${whatIfBpei - bpei} pts</div>
+                    </div>` : ''}
+                    <div style="flex:1;min-width:120px;background:#dcfce7;border-radius:6px;padding:8px 10px;">
+                        <div style="font-size:9px;color:#166534;margin-bottom:2px;">Si todas → alta efectividad</div>
+                        <div style="font-size:18px;font-weight:800;color:#166534;">${whatIfBpeiHigh}%</div>
+                        <div style="font-size:9px;color:#16a34a;">+${whatIfBpeiHigh - bpei} pts</div>
+                    </div>
+                </div>`;
+
             // Estado colapsado persistente (mantenido en el panel mismo)
             const prevCrit = panel.querySelector('.fase2-criticality-body');
             const critOpen = prevCrit ? prevCrit.style.display !== 'none' : false;
+            const prevWhatIf = panel.querySelector('.fase3-whatif-body');
+            const whatIfOpen = prevWhatIf ? prevWhatIf.style.display !== 'none' : false;
 
             panel.innerHTML = `
                 <div class="risk-summary-header">
                     <span style="font-size:13px;font-weight:700;color:#333;">Análisis de Riesgo</span>
                     <span style="font-size:11px;color:#777;font-style:italic;margin-left:4px;">${summaryText}</span>
                     <span style="flex:1"></span>
-                    <span title="Índice de Efectividad del Portafolio de Barreras" style="font-size:12px;font-weight:800;padding:3px 10px;border-radius:20px;background:${bpeiBg};color:${bpeiColor};border:1px solid ${bpeiBorder};margin-right:4px;cursor:default;" title="BPEI: Efectividad total del portafolio de barreras">BPEI ${bpei}%</span>
+                    <span title="Índice de Efectividad del Portafolio de Barreras" style="font-size:12px;font-weight:800;padding:3px 10px;border-radius:20px;background:${bpeiBg};color:${bpeiColor};border:1px solid ${bpeiBorder};margin-right:4px;cursor:default;">BPEI ${bpei}%</span>
                     <span class="risk-metric-chip">${causes.length} causa${causes.length !== 1 ? 's' : ''}</span>
                     <span class="risk-metric-chip">${impacts.length} consecuencia${impacts.length !== 1 ? 's' : ''}</span>
                     <span class="risk-metric-chip">${totalBarriers} barrera${totalBarriers !== 1 ? 's' : ''}</span>
@@ -2040,6 +2193,30 @@
                 </div>
                 <div class="risk-summary-body">
                     ${alertsHTML}
+                </div>
+                <div style="border-top:1px solid #f0f0f0;">
+                    <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'flex':'none';" style="display:flex;align-items:center;gap:6px;padding:8px 14px;cursor:pointer;user-select:none;background:#fafafa;border-bottom:1px solid #f0f0f0;">
+                        <span style="font-size:12px;font-weight:700;color:#444;">Posición en Matriz de Riesgo</span>
+                        <span style="font-size:10px;color:#999;margin-left:4px;">— causas y consecuencias</span>
+                        <span style="margin-left:auto;font-size:11px;color:#aaa;">▼</span>
+                    </div>
+                    <div style="display:none;padding:12px 14px;gap:16px;flex-wrap:wrap;align-items:flex-start;">
+                        <div>${miniMatrixHTML}</div>
+                        <div style="flex:1;min-width:160px;">
+                            <div style="font-size:10px;color:#888;margin-bottom:6px;">Probabilidad (filas): I=Improbable, P=Posible, Pr=Probable, A=Altamente</div>
+                            <div style="font-size:10px;color:#888;">Severidad (cols): Me=Menor, Mo=Moderado, Al=Alto, C=Catastrófico</div>
+                        </div>
+                    </div>
+                </div>
+                <div style="border-top:1px solid #f0f0f0;">
+                    <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';" style="display:flex;align-items:center;gap:6px;padding:8px 14px;cursor:pointer;user-select:none;background:#fafafa;border-bottom:1px solid #f0f0f0;">
+                        <span style="font-size:12px;font-weight:700;color:#444;">Análisis What-If</span>
+                        <span style="font-size:10px;color:#999;margin-left:4px;">— potencial de mejora del portafolio</span>
+                        <span style="margin-left:auto;font-size:11px;color:#aaa;">▼</span>
+                    </div>
+                    <div class="fase3-whatif-body" style="display:${whatIfOpen ? 'block' : 'none'};padding:12px 14px;">
+                        ${whatIfHTML}
+                    </div>
                 </div>
                 <div style="border-top:1px solid #f0f0f0;">
                     <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';" style="display:flex;align-items:center;gap:6px;padding:8px 14px;cursor:pointer;user-select:none;background:#fafafa;border-bottom:1px solid #f0f0f0;">
@@ -2755,6 +2932,152 @@
         }
 
         // =====================================================================
+        // FASE 3: D12 — Undo/Redo
+        // =====================================================================
+        function pushUndoSnapshot() {
+            if (_undoRestoring) return;
+            const json = JSON.stringify(serializeBowtieState());
+            if (undoStack.length > 0 && undoStack[undoStack.length - 1] === json) return;
+            undoStack.push(json);
+            if (undoStack.length > UNDO_MAX) undoStack.shift();
+            redoStack = [];
+            _updateUndoRedoUI();
+        }
+        function undoBowtie() {
+            if (undoStack.length <= 1) { showToastMessage('Nada para deshacer', 'info'); return; }
+            redoStack.push(undoStack.pop());
+            _undoRestoring = true;
+            deserializeBowtieState(JSON.parse(undoStack[undoStack.length - 1]));
+            _undoRestoring = false;
+            _updateUndoRedoUI();
+            showToastMessage('Acción deshecha', 'info');
+        }
+        function redoBowtie() {
+            if (redoStack.length === 0) { showToastMessage('Nada para rehacer', 'info'); return; }
+            const next = redoStack.pop();
+            undoStack.push(next);
+            _undoRestoring = true;
+            deserializeBowtieState(JSON.parse(next));
+            _undoRestoring = false;
+            _updateUndoRedoUI();
+            showToastMessage('Acción rehecha', 'info');
+        }
+        function _updateUndoRedoUI() {
+            const ub = document.getElementById('undoBtn');
+            const rb = document.getElementById('redoBtn');
+            if (ub) ub.disabled = undoStack.length <= 1;
+            if (rb) rb.disabled = redoStack.length === 0;
+        }
+
+        // =====================================================================
+        // FASE 3: E15 — Exportar PDF
+        // =====================================================================
+        function exportPDF() {
+            if (activeTab !== 'bowtie') { showToastMessage('Cambia al tab BowTie para exportar PDF', 'info'); return; }
+            renderBowTieDiagram(false);
+            setTimeout(() => window.print(), 300);
+        }
+
+        // =====================================================================
+        // FASE 4: B7 — Modal de Deep Dive por nodo (causa / consecuencia)
+        // =====================================================================
+        function openDeepDiveModal(type, refId) {
+            const { causes, impacts, riskEventName } = _lastRenderState;
+            const node = type === 'cause'
+                ? causes.find(c => c.refId === refId)
+                : impacts.find(i => i.refId === refId);
+            if (!node) { focusBowtieGroup(refId); return; }
+
+            const probScores = { improbable: 1, posible: 2, probable: 3, altamente: 4 };
+            const sevScores  = { menor: 1, moderado: 2, alto: 3, catastrofico: 4 };
+            const probLabels = { improbable: 'Improbable', posible: 'Posible', probable: 'Probable', altamente: 'Altamente probable' };
+            const sevLabels  = { menor: 'Menor', moderado: 'Moderado', alto: 'Alto', catastrofico: 'Catastrófico' };
+
+            const isCause = type === 'cause';
+            const score = isCause ? Math.pow(probScores[node.prob] || 2, 2) : Math.pow(sevScores[node.severity] || 2, 2);
+            const scoreLabel = isCause ? probLabels[node.prob] : sevLabels[node.severity];
+            const riskLabel = score >= 9 ? 'Alto' : score >= 4 ? 'Medio' : 'Bajo';
+            const riskColor = score >= 9 ? '#dc2626' : score >= 4 ? '#b45309' : '#16a34a';
+            const resF = calcResidualFactor(node.barriers);
+            const residual = (score * resF).toFixed(2);
+            const reduction = Math.round((1 - resF) * 100);
+
+            const effMap = { high: 0.8, medium: 0.5, low: 0.2 };
+            const effLabels = { high: 'Alta', medium: 'Media', low: 'Baja' };
+            const effColors = { high: '#16a34a', medium: '#b45309', low: '#dc2626' };
+
+            let barriersHTML = node.barriers.length === 0
+                ? '<p style="color:#999;font-size:12px;font-style:italic;">Sin barreras registradas</p>'
+                : node.barriers.map((b, idx) => {
+                    const barriersWithout = node.barriers.filter((_, i) => i !== idx);
+                    const marginal = (score * calcResidualFactor(barriersWithout) - score * resF).toFixed(2);
+                    const ec = effColors[b.eff] || '#555';
+                    const el2 = effLabels[b.eff] || b.eff;
+                    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f5f5f5;">
+                        <span style="flex:1;font-size:12px;color:#1a1a1a;">${b.text || '(sin nombre)'}</span>
+                        <span style="font-size:10px;font-weight:700;color:${ec};background:${ec}22;border-radius:4px;padding:2px 6px;">${el2}</span>
+                        <span style="font-size:10px;color:#777;" title="Incremento de riesgo si se elimina esta barrera">Δ ${marginal}</span>
+                    </div>`;
+                }).join('');
+
+            // Pathway partners (for cross-analysis)
+            const partners = isCause ? impacts : causes;
+            const partnersHTML = partners.length === 0 ? '<span style="color:#999;font-size:11px;">—</span>'
+                : partners.map(p => {
+                    const ps = isCause ? Math.pow(sevScores[p.severity] || 2, 2) : Math.pow(probScores[p.prob] || 2, 2);
+                    const pathScore = score * ps / (isCause ? 4 : 4); // simplified cross score indicator
+                    const plabel = isCause ? (sevLabels[p.severity] || p.severity) : (probLabels[p.prob] || p.prob);
+                    return `<span style="font-size:11px;background:#f5f5f5;border-radius:4px;padding:2px 7px;display:inline-block;margin:2px;">${p.name || '—'} <span style="color:#999;">(${plabel})</span></span>`;
+                }).join('');
+
+            let modal = document.getElementById('deepDiveModal');
+            if (modal) modal.remove();
+            modal = document.createElement('div');
+            modal.id = 'deepDiveModal';
+            modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10001;display:flex;align-items:center;justify-content:center;padding:16px;';
+            modal.innerHTML = `
+                <div style="background:#fff;border-radius:12px;padding:0;max-width:520px;width:100%;box-shadow:0 12px 48px rgba(0,0,0,0.25);max-height:90vh;display:flex;flex-direction:column;">
+                    <div style="padding:20px 24px 14px;border-bottom:1px solid #f0f0f0;display:flex;align-items:flex-start;gap:12px;">
+                        <div style="flex:1;">
+                            <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;">${isCause ? 'CAUSA' : 'CONSECUENCIA'}</div>
+                            <div style="font-size:16px;font-weight:700;color:#1a1a1a;line-height:1.3;">${node.name || '(sin nombre)'}</div>
+                            <div style="font-size:12px;color:#666;margin-top:2px;">${scoreLabel}</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:22px;font-weight:800;color:${riskColor};">${score}/16</div>
+                            <div style="font-size:11px;color:${riskColor};font-weight:600;">${riskLabel}</div>
+                        </div>
+                    </div>
+                    <div style="padding:16px 24px;overflow-y:auto;flex:1;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+                            <div style="background:#f8f8f8;border-radius:8px;padding:10px;text-align:center;">
+                                <div style="font-size:11px;color:#999;margin-bottom:3px;">Riesgo inherente</div>
+                                <div style="font-size:18px;font-weight:800;color:#333;">${score}</div>
+                            </div>
+                            <div style="background:#f8f8f8;border-radius:8px;padding:10px;text-align:center;">
+                                <div style="font-size:11px;color:#999;margin-bottom:3px;">Riesgo residual</div>
+                                <div style="font-size:18px;font-weight:800;color:${riskColor};">${residual}</div>
+                            </div>
+                            <div style="background:#f8f8f8;border-radius:8px;padding:10px;text-align:center;">
+                                <div style="font-size:11px;color:#999;margin-bottom:3px;">Reducción</div>
+                                <div style="font-size:18px;font-weight:800;color:#16a34a;">${reduction}%</div>
+                            </div>
+                        </div>
+                        <div style="font-size:12px;font-weight:700;color:#444;margin-bottom:8px;">Barreras ${isCause ? 'Preventivas' : 'Mitigativas'} (${node.barriers.length})</div>
+                        <div style="margin-bottom:14px;">${barriersHTML}</div>
+                        <div style="font-size:12px;font-weight:700;color:#444;margin-bottom:6px;">${isCause ? 'Consecuencias vinculadas' : 'Causas vinculadas'}</div>
+                        <div style="line-height:2;">${partnersHTML}</div>
+                    </div>
+                    <div style="padding:12px 24px;border-top:1px solid #f0f0f0;display:flex;gap:8px;">
+                        <button onclick="document.getElementById('deepDiveModal').remove();focusBowtieGroup('${refId}');" style="flex:1;padding:9px;background:#f5f5f5;border:1px solid #e5e7eb;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px;color:#333;">Ir al panel de edición</button>
+                        <button onclick="document.getElementById('deepDiveModal').remove();" style="flex:1;padding:9px;background:#FFF159;border:1px solid #f0d800;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;">Cerrar</button>
+                    </div>
+                </div>`;
+            modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+            document.body.appendChild(modal);
+        }
+
+        // =====================================================================
         // FASE 1: D11 — Auto-guardado en localStorage
         // =====================================================================
         function serializeBowtieState() {
@@ -2939,6 +3262,10 @@
                     else if (ig) addMitigativeBarrierInput(ig.id);
                     else showToastMessage('Haz clic en una causa o consecuencia primero', 'info');
                 }
+            } else if (e.ctrlKey && e.key === 'z') {
+                e.preventDefault(); if (activeTab === 'bowtie') undoBowtie();
+            } else if (e.ctrlKey && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+                e.preventDefault(); if (activeTab === 'bowtie') redoBowtie();
             } else if (e.ctrlKey && e.key === 's') {
                 e.preventDefault(); exportCurrentAnalysis();
             } else if (!isTyping && e.key === '?') {
@@ -2946,6 +3273,8 @@
             } else if (e.key === 'Escape') {
                 const ov = document.getElementById('keyboardShortcutsOverlay');
                 if (ov && ov.style.display !== 'none') ov.style.display = 'none';
+                const ddm = document.getElementById('deepDiveModal');
+                if (ddm) ddm.remove();
             }
         });
 
@@ -2961,9 +3290,11 @@
                     <tr><td style="padding:7px 0;color:#666;font-family:monospace;font-size:12px;">Ctrl + Shift + C</td><td style="padding:7px 0;font-weight:600;color:#333;">Nueva Causa</td></tr>
                     <tr style="background:#fafafa;"><td style="padding:7px 4px;color:#666;font-family:monospace;font-size:12px;">Ctrl + Shift + I</td><td style="padding:7px 4px;font-weight:600;color:#333;">Nueva Consecuencia</td></tr>
                     <tr><td style="padding:7px 0;color:#666;font-family:monospace;font-size:12px;">Ctrl + Shift + B</td><td style="padding:7px 0;font-weight:600;color:#333;">Nueva Barrera (en grupo activo)</td></tr>
+                    <tr style="background:#fafafa;"><td style="padding:7px 4px;color:#666;font-family:monospace;font-size:12px;">Ctrl + Z</td><td style="padding:7px 4px;font-weight:600;color:#333;">Deshacer</td></tr>
+                    <tr><td style="padding:7px 0;color:#666;font-family:monospace;font-size:12px;">Ctrl + Y</td><td style="padding:7px 0;font-weight:600;color:#333;">Rehacer</td></tr>
                     <tr style="background:#fafafa;"><td style="padding:7px 4px;color:#666;font-family:monospace;font-size:12px;">Ctrl + S</td><td style="padding:7px 4px;font-weight:600;color:#333;">Exportar XLSX</td></tr>
                     <tr><td style="padding:7px 0;color:#666;font-family:monospace;font-size:12px;">?</td><td style="padding:7px 0;font-weight:600;color:#333;">Mostrar/ocultar este panel</td></tr>
-                    <tr style="background:#fafafa;"><td style="padding:7px 4px;color:#666;font-family:monospace;font-size:12px;">Esc</td><td style="padding:7px 4px;font-weight:600;color:#333;">Cerrar panel</td></tr>
+                    <tr style="background:#fafafa;"><td style="padding:7px 4px;color:#666;font-family:monospace;font-size:12px;">Esc</td><td style="padding:7px 4px;font-weight:600;color:#333;">Cerrar panel / modal</td></tr>
                   </table>
                   <button onclick="document.getElementById('keyboardShortcutsOverlay').style.display='none'" style="margin-top:18px;width:100%;padding:9px;background:#FFF159;border:1px solid #f0d800;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;">Cerrar</button>
                 </div>`;
