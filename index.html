@@ -480,8 +480,6 @@
                         </div>
                     </div>
                     <div id="bowtieDiagram" class="w-full rounded-lg bg-gray-50"></div>
-                    <!-- Panel de resumen de riesgo -->
-                    <div id="bowtieRiskSummary"></div>
                     <!-- Leyenda consolidada -->
                     <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-gray-600 mt-4 pt-3 border-t border-gray-100" aria-label="Leyenda del diagrama">
                         <span class="font-semibold text-gray-700">Efectividad barrera:</span>
@@ -501,6 +499,8 @@
                         <span class="flex items-center gap-1"><span class="legend-swatch impact-high" aria-hidden="true"></span>Alto</span>
                         <span class="flex items-center gap-1"><span class="legend-swatch impact-catastrophic" aria-hidden="true"></span>Catastrófico</span>
                     </div>
+                    <!-- Panel de resumen de riesgo -->
+                    <div id="bowtieRiskSummary"></div>
                 </section>
             </div>
 
@@ -1366,7 +1366,7 @@
             }
             function calcNodeH(name) {
                 // top-pad(14) + lines×15 + badge-area(16)
-                return 14 + wrapSvgText(name, 20, 3).length * 15 + 16;
+                return 14 + wrapSvgText(name, 18, 4).length * 15 + 16;
             }
 
             // --- Dimensiones ---
@@ -1390,7 +1390,7 @@
                 else evCur = candidate;
             });
             if (evCur) evLines.push(evCur);
-            const R = Math.max(62, 18 + evLines.length * 16);
+            const R = Math.max(62, Math.ceil(evLines.length * 16 / 2) + 20);
             const H = Math.max(420, numRows * rowH + 100, 2 * R + 80);
             const cx = W / 2, cy = H / 2;
             const nodeW = 190;
@@ -1401,6 +1401,25 @@
                 const span = Math.min(H - 130, rowH * (total - 1));
                 return cy - span / 2 + i * (span / (total - 1));
             }
+
+            // --- Collision detection para labels ---
+            const placedRects = [];
+            function rectsOverlap(a, b, pad) {
+                pad = pad || 4;
+                return a.x - pad < b.x + b.w && a.x + a.w + pad > b.x && a.y - pad < b.y + b.h && a.y + a.h + pad > b.y;
+            }
+            // Pre-registrar nodos y evento central para evitar solapamiento
+            causes.forEach((c, i) => {
+                const ncy = getNodeCY(i, causes.length);
+                const nH = calcNodeH(c.name);
+                placedRects.push({ x: leftNodeX, y: ncy - nH / 2, w: nodeW, h: nH });
+            });
+            impacts.forEach((imp, i) => {
+                const ncy = getNodeCY(i, impacts.length);
+                const nH = calcNodeH(imp.name);
+                placedRects.push({ x: rightNodeX, y: ncy - nH / 2, w: nodeW, h: nH });
+            });
+            placedRects.push({ x: cx - R, y: cy - R, w: 2 * R, h: 2 * R });
 
             // --- Paletas ---
             const probColors  = { improbable: '#52c41a', posible: '#faad14', probable: '#ff7a00', altamente: '#f5222d' };
@@ -1530,14 +1549,21 @@
                         fill: effColor, 'fill-opacity': 0.88,
                         transform: `translate(${bx},${by}) rotate(${pathAngle})` }));
 
-                    // Label flotante: alterna arriba/abajo entre barreras del mismo path para evitar solapamiento
-                    const labelSign = baseSign * (bIdx % 2 === 0 ? 1 : -1);
+                    // Label flotante: posición con detección de colisión global
                     const bLines = wrapSvgText(barrier.text, 14, 3);
                     const lW = 110;
                     const lH = 12 + bLines.length * 14;
-                    const dist = 50 + lH / 2;
-                    const lx = bx + labelSign * uy * dist;
-                    const ly = by - labelSign * ux * dist;
+                    let lx, ly, labelSign;
+                    let placed = false;
+                    for (let att = 0; att < 10 && !placed; att++) {
+                        labelSign = att < 5 ? baseSign : -baseSign;
+                        const d = 50 + lH / 2 + (att % 5) * (lH + 8);
+                        lx = bx + labelSign * uy * d;
+                        ly = by - labelSign * ux * d;
+                        const cr = { x: lx - lW / 2, y: ly - lH / 2, w: lW, h: lH };
+                        if (!placedRects.some(r => rectsOverlap(cr, r))) placed = true;
+                    }
+                    placedRects.push({ x: lx - lW / 2, y: ly - lH / 2, w: lW, h: lH });
 
                     // Connector
                     bg.appendChild(el('line', {
@@ -1620,7 +1646,7 @@
                 const color = probColors[cause.prob] || '#faad14';
                 const bg = probBg[cause.prob] || '#fffbe6';
                 const label = probLabels[cause.prob] || cause.prob;
-                const nameLines = wrapSvgText(cause.name, 20, 3);
+                const nameLines = wrapSvgText(cause.name, 18, 4);
                 const nodeH = calcNodeH(cause.name);
                 const g = el('g', { style: 'cursor:pointer' });
                 g.addEventListener('click', () => focusBowtieGroup(cause.refId));
@@ -1642,7 +1668,7 @@
                 const color = sevColors[impact.severity] || '#faad14';
                 const bg = sevBg[impact.severity] || '#fffbe6';
                 const label = sevLabels[impact.severity] || impact.severity;
-                const nameLines = wrapSvgText(impact.name, 20, 3);
+                const nameLines = wrapSvgText(impact.name, 18, 4);
                 const nodeH = calcNodeH(impact.name);
                 const g = el('g', { style: 'cursor:pointer' });
                 g.addEventListener('click', () => focusBowtieGroup(impact.refId));
