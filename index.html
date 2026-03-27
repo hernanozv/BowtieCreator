@@ -92,66 +92,70 @@
             color: #333333; 
         }
 
-        /* --- Estilos para los diagramas (sin cambios de color) --- */
-        .diagram-box {
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            transition: transform 0.2s ease-in-out;
+        /* --- Estilos para el diagrama BowTie SVG --- */
+        #bowtieDiagram {
+            overflow-x: auto;
+            overflow-y: visible;
+            min-height: 200px;
         }
-        .diagram-box:hover {
-            transform: translateY(-2px);
+        /* Panel de resumen de riesgo */
+        #bowtieRiskSummary {
+            margin-top: 1.25rem;
+            border-radius: 0.5rem;
+            overflow: hidden;
         }
-        .diagram-section-title {
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
-        }
-        .barrier-line {
-            height: 2px;
-            width: 10px; 
-        }
-        .preventive-barrier-line { background-color: #7dd3fc; }
-        .mitigative-barrier-line { background-color: #fca5a5; }
-        /* Conectores y formas inspiradas en BowTie de referencia */
-        #eventBoxDiagram {
-            border-radius: 9999px;
-            aspect-ratio: 1 / 1;
-            min-width: 120px;
-            min-height: 120px;
+        .risk-summary-header {
+            background: #FFF159;
+            border: 1.5px solid #f0d800;
+            border-bottom: none;
+            padding: 0.5rem 1rem;
             display: flex;
             align-items: center;
-            justify-content: center;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+            gap: 0.5rem;
+            border-radius: 0.5rem 0.5rem 0 0;
         }
-        .cause-box, .impact-box {
+        .risk-summary-body {
+            background: #fffde7;
+            border: 1.5px solid #f0d800;
+            border-top: none;
+            padding: 0.75rem 1rem;
+            border-radius: 0 0 0.5rem 0.5rem;
+        }
+        .risk-metrics-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .risk-metric-chip {
+            background: #fff;
+            border: 1px solid #e5e7eb;
             border-radius: 9999px;
+            padding: 0.2rem 0.75rem;
+            font-size: 0.75rem;
+            color: #374151;
+            font-weight: 500;
         }
-        .barrier-box {
+        .risk-alert {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            padding: 0.35rem 0;
+            font-size: 0.78rem;
+            color: #374151;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        .risk-alert:last-child { border-bottom: none; }
+        .risk-alert-dot {
+            width: 9px; height: 9px;
             border-radius: 9999px;
+            flex-shrink: 0;
+            margin-top: 3px;
         }
-        .connector-svg svg { display: block; }
-        /* Mejor definición en conectores */
-        .connector-svg svg { shape-rendering: geometricPrecision; }
-        .connector-svg svg line { stroke-linecap: round; }
-        /* Cuñas triangulares y rótulos de fase */
-        #threatsSide, #consequencesSide { position: relative; overflow: hidden; }
-        #threatsSide::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: rgba(255,255,255,0.12);
-            clip-path: polygon(0% 0%, 100% 50%, 0% 100%);
-            z-index: 0;
-            pointer-events: none;
-        }
-        #consequencesSide::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: rgba(255,255,255,0.12);
-            clip-path: polygon(100% 0%, 0% 50%, 100% 100%);
-            z-index: 0;
-            pointer-events: none;
-        }
-        #threatsSide::after { content: none; }
-        #consequencesSide::after { content: none; }
+        .risk-alert-dot.critical { background: #e53935; }
+        .risk-alert-dot.warning { background: #ff7a00; }
+        .risk-alert-dot.info { background: #f59e0b; }
+        .risk-alert-dot.good { background: #16a34a; }
         /* Indicador de efectividad de barreras */
         .eff-dot {
             display: inline-block;
@@ -401,27 +405,9 @@
           -webkit-font-smoothing: antialiased !important;
           -moz-osx-font-smoothing: grayscale !important;
         }
-        /* Evitar blur por transform durante exportación */
-        #bowtieDiagramVisualization.exporting .diagram-box,
-        #bowtieDiagram.exporting .diagram-box {
-          transform: none !important;
-          box-shadow: none !important;
-        }
-        #bowtieDiagramVisualization.exporting #eventBoxDiagram,
-        #bowtieDiagramVisualization.exporting .cause-box,
-        #bowtieDiagramVisualization.exporting .impact-box,
-        #bowtieDiagram.exporting #eventBoxDiagram,
-        #bowtieDiagram.exporting .cause-box,
-        #bowtieDiagram.exporting .impact-box {
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-        }
-        /* Barreras: alinear ícono y texto verticalmente durante la exportación */
-        #bowtieDiagramVisualization.exporting .barrier-box,
-        #bowtieDiagram.exporting .barrier-box {
-          display: inline-flex !important;
-          align-items: center !important;
+        /* SVG del diagrama: sin transformaciones problemáticas durante exportación */
+        #bowtieDiagramVisualization.exporting #bowtieDiagram svg {
+          shape-rendering: geometricPrecision !important;
         }
     </style>
 </head>
@@ -499,37 +485,30 @@
                             </button>
                         </div>
                     </div>
-                    <div id="bowtieDiagram" class="flex flex-col md:flex-row justify-between items-stretch w-full p-2 md:p-4 min-h-[300px] gap-2 md:gap-4">
-                        <div id="threatsSide" class="w-full md:w-2/5 flex flex-col items-center p-3 md:p-4 bg-sky-600 rounded-xl text-white diagram-box">
-                            <h3 class="text-xl md:text-2xl font-bold mb-4 diagram-section-title">CAUSAS</h3>
-                            <div id="causesContainerForDiagram" class="space-y-2 w-full flex flex-col items-center"></div>
-                        </div>
-                        <div id="eventSide" class="w-full md:w-1/5 flex flex-col items-center justify-center p-2 md:p-4 my-4 md:my-0">
-                            <div id="eventBoxDiagram" class="bg-[#FFF159] text-gray-900 border border-yellow-300 p-4 md:p-6 rounded-xl text-center font-bold text-lg md:text-xl shadow-xl min-h-[80px] flex items-center justify-center diagram-box">
-                                EVENTO
-                            </div>
-                        </div>
-                        <div id="consequencesSide" class="w-full md:w-2/5 flex flex-col items-center p-3 md:p-4 bg-rose-600 rounded-xl text-white diagram-box">
-                            <h3 class="text-xl md:text-2xl font-bold mb-4 diagram-section-title">CONSECUENCIAS</h3>
-                            <div id="impactsContainerForDiagram" class="space-y-2 w-full flex flex-col items-center"></div>
-                        </div>
-                    </div>
-                    <!-- Leyendas de Probabilidad e Impacto (debajo del diagrama) -->
-                    <div class="flex flex-col md:flex-row items-start justify-between text-xs text-gray-600 mt-4 gap-3" aria-label="Referencias de colores de probabilidad e impacto">
-                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                            <span class="mr-1 font-medium text-gray-700">Probabilidad:</span>
-                            <span class="flex items-center"><span class="legend-swatch prob-improbable" aria-hidden="true"></span>Improbable</span>
-                            <span class="flex items-center"><span class="legend-swatch prob-posible" aria-hidden="true"></span>Posible</span>
-                            <span class="flex items-center"><span class="legend-swatch prob-probable" aria-hidden="true"></span>Probable</span>
-                            <span class="flex items-center"><span class="legend-swatch prob-altamente" aria-hidden="true"></span>Altamente probable</span>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                            <span class="mr-1 font-medium text-gray-700">Impacto:</span>
-                            <span class="flex items-center"><span class="legend-swatch impact-minor" aria-hidden="true"></span>Menor</span>
-                            <span class="flex items-center"><span class="legend-swatch impact-moderate" aria-hidden="true"></span>Moderado</span>
-                            <span class="flex items-center"><span class="legend-swatch impact-high" aria-hidden="true"></span>Alto</span>
-                            <span class="flex items-center"><span class="legend-swatch impact-catastrophic" aria-hidden="true"></span>Catastrófico</span>
-                        </div>
+                    <div id="bowtieDiagram" class="w-full rounded-lg bg-gray-50"></div>
+                    <!-- Panel de resumen de riesgo -->
+                    <div id="bowtieRiskSummary"></div>
+                    <!-- Leyenda consolidada -->
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600 mt-4 pt-3 border-t border-gray-100" aria-label="Leyenda del diagrama">
+                        <span class="font-semibold text-gray-700">Barreras:</span>
+                        <span class="flex items-center gap-1"><span class="eff-dot eff-high" aria-hidden="true"></span>Alta efectividad</span>
+                        <span class="flex items-center gap-1"><span class="eff-dot eff-medium" aria-hidden="true"></span>Media efectividad</span>
+                        <span class="flex items-center gap-1"><span class="eff-dot eff-low" aria-hidden="true"></span>Baja efectividad</span>
+                        <span class="text-gray-300 hidden sm:inline">|</span>
+                        <span class="font-semibold text-gray-700">Riesgo del path:</span>
+                        <span class="flex items-center gap-1"><span style="display:inline-block;width:22px;height:3px;background:#52c41a;border-radius:2px;" aria-hidden="true"></span>Bajo</span>
+                        <span class="flex items-center gap-1"><span style="display:inline-block;width:22px;height:3px;background:#ff7a00;border-radius:2px;" aria-hidden="true"></span>Medio</span>
+                        <span class="flex items-center gap-1"><span style="display:inline-block;width:22px;height:3px;background:#f5222d;border-radius:2px;" aria-hidden="true"></span>Alto</span>
+                        <span class="text-gray-300 hidden sm:inline">|</span>
+                        <span class="flex items-center gap-1"><span class="legend-swatch prob-improbable" aria-hidden="true"></span>Improbable</span>
+                        <span class="flex items-center gap-1"><span class="legend-swatch prob-posible" aria-hidden="true"></span>Posible</span>
+                        <span class="flex items-center gap-1"><span class="legend-swatch prob-probable" aria-hidden="true"></span>Probable</span>
+                        <span class="flex items-center gap-1"><span class="legend-swatch prob-altamente" aria-hidden="true"></span>Alt. probable</span>
+                        <span class="text-gray-300 hidden sm:inline">|</span>
+                        <span class="flex items-center gap-1"><span class="legend-swatch impact-minor" aria-hidden="true"></span>Menor</span>
+                        <span class="flex items-center gap-1"><span class="legend-swatch impact-moderate" aria-hidden="true"></span>Moderado</span>
+                        <span class="flex items-center gap-1"><span class="legend-swatch impact-high" aria-hidden="true"></span>Alto</span>
+                        <span class="flex items-center gap-1"><span class="legend-swatch impact-catastrophic" aria-hidden="true"></span>Catastrófico</span>
                     </div>
                 </section>
             </div>
@@ -1110,7 +1089,7 @@
                         </svg>
                     </button>
                 </div>
-                <input type="text" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 cause-name-input" placeholder="Nombre de la causa">
+                <input type="text" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 cause-name-input" placeholder="Describir la causa raíz…">
                 <div class="mt-2">
                     <label class="text-sm font-medium text-gray-600">Probabilidad:</label>
                     <div class="mt-1 flex items-center gap-3">
@@ -1176,7 +1155,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M17 10l-7 7-7-7h14z"/></svg>
                   </button>
                 </div>
-                <input type="text" class="w-full p-1 border border-gray-300 rounded-md text-sm preventive-barrier-input" placeholder="Descripción de la barrera">
+                <input type="text" class="w-full p-1 border border-gray-300 rounded-md text-sm preventive-barrier-input" placeholder="Ej: Procedimiento de bloqueo, revisión…">
                 <select class="barrier-effectiveness text-xs border border-gray-300 rounded-md p-1 ml-1" title="Efectividad">
                     <option value="high">Alta</option>
                     <option value="medium" selected>Media</option>
@@ -1225,7 +1204,7 @@
                         </svg>
                     </button>
                 </div>
-                <input type="text" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 impact-name-input" placeholder="Nombre de la Consecuencia">
+                <input type="text" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 impact-name-input" placeholder="Describir la consecuencia…">
                 <div class="mt-2">
                     <label class="text-sm font-medium text-gray-600">Impacto:</label>
                     <div class="mt-1 flex items-center gap-3">
@@ -1279,7 +1258,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M17 10l-7 7-7-7h14z"/></svg>
                   </button>
                 </div>
-                <input type="text" class="w-full p-1 border border-gray-300 rounded-md text-sm mitigative-barrier-input" placeholder="Descripción de la barrera">
+                <input type="text" class="w-full p-1 border border-gray-300 rounded-md text-sm mitigative-barrier-input" placeholder="Ej: Plan de contingencia, alarma…">
                 <select class="barrier-effectiveness text-xs border border-gray-300 rounded-md p-1 ml-1" title="Efectividad">
                     <option value="high">Alta</option>
                     <option value="medium" selected>Media</option>
@@ -1334,87 +1313,436 @@
         }
 
         function renderBowTieDiagram(scrollIntoView = true) {
-            const riskEventName = document.getElementById('riskEvent').value || "EVENTO CENTRAL";
-            document.getElementById('eventBoxDiagram').textContent = riskEventName;
-            const causesContainerDiagram = document.getElementById('causesContainerForDiagram');
-            const impactsContainerDiagram = document.getElementById('impactsContainerForDiagram');
-            causesContainerDiagram.innerHTML = ''; 
-            impactsContainerDiagram.innerHTML = ''; 
+            const riskEventName = (document.getElementById('riskEvent').value || 'EVENTO CENTRAL').trim() || 'EVENTO CENTRAL';
+
+            // --- Recolectar datos ---
+            const causes = [];
+            const impacts = [];
 
             document.querySelectorAll('.cause-input-group').forEach(group => {
-                const causeName = group.querySelector('.cause-name-input').value || "Causa";
-                const causeRefId = group.id;
-                const causeProb = (group.querySelector('.cause-probability')?.value) || 'posible';
-                const preventiveItems = Array.from(group.querySelectorAll('.barrier-input-item'));
-                const preventiveBarriers = preventiveItems.map(it => {
-                    const txt = (it.querySelector('.preventive-barrier-input')?.value || '').trim();
-                    const eff = it.querySelector('.barrier-effectiveness')?.value || 'medium';
-                    return { text: txt, eff };
-                }).filter(b => b.text !== "");
-                const causeDiagramItem = document.createElement('div');
-                causeDiagramItem.className = 'cause-item flex flex-col md:flex-row items-center justify-start w-full p-1 gap-1 md:gap-2'; 
-                let barriersHTML = preventiveBarriers.length > 0 ? preventiveBarriers.map((b, idx) => {
-                    const effClass = b.eff === 'high' ? 'eff-high' : (b.eff === 'low' ? 'eff-low' : 'eff-medium');
-                    const effLabel = b.eff === 'high' ? 'Alta' : (b.eff === 'low' ? 'Baja' : 'Media');
-                    return `<div class="flex items-center justify-end w-full">
-                        <div class="barrier-box bg-sky-50 text-sky-900 border border-sky-200 hover:bg-sky-100 p-1.5 rounded-md text-xs shadow-sm diagram-box flex-1 text-left cursor-pointer transition transform duration-150 ease-out hover:shadow-sm hover:-translate-y-px hover:ring-1 hover:ring-sky-200" onclick="focusBowtieBarrier('${causeRefId}', 'preventive', ${idx})"><span class=\"eff-dot ${effClass}\" title=\"Efectividad: ${effLabel}\"></span>${b.text}</div>
-                        <div class="barrier-line preventive-barrier-line ml-1"></div>
-                    </div>`;
-                }).join('<div class="h-1"></div>') : '<div class="text-xs text-sky-200 italic text-center w-full">Sin barreras</div>';
-                const probClass = (causeProb === 'improbable') ? 'prob-improbable' : (causeProb === 'probable') ? 'prob-probable' : (causeProb === 'altamente') ? 'prob-altamente' : 'prob-posible';
-                const probLabel = (causeProb === 'improbable') ? 'Improbable' : (causeProb === 'probable') ? 'Probable' : (causeProb === 'altamente') ? 'Altamente probable' : 'Posible';
-                causeDiagramItem.innerHTML = `
-                    <div class="cause-box bg-slate-50 border border-slate-300 text-slate-900 p-2 rounded-lg shadow-sm text-center diagram-box w-full md:w-1/2 order-1 cursor-pointer transition duration-150 ease-out transform hover:shadow-sm hover:-translate-y-px indicator-left ${probClass}" title="Probabilidad: ${probLabel}" onclick="focusBowtieGroup('${causeRefId}')">${causeName}</div>
-                    <div class="preventive-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-2 items-stretch">
-                        ${barriersHTML}
-                    </div>
-                    <div class="connector-svg hidden md:flex items-center justify-center md:w-12 order-3" aria-hidden="true">
-                        <svg class="w-12 h-3" viewBox="0 0 48 12">
-                            <line x1="0" y1="6" x2="36" y2="6" stroke="#ffffff" stroke-opacity="0.95" stroke-width="2"></line>
-                            <polygon points="36,2 46,6 36,10" fill="#ffffff" fill-opacity="0.95"></polygon>
-                        </svg>
-                    </div>`;
-                causesContainerDiagram.appendChild(causeDiagramItem);
+                const name = (group.querySelector('.cause-name-input')?.value || '').trim() || 'Causa';
+                const prob = group.querySelector('.cause-probability')?.value || 'posible';
+                const barriers = Array.from(group.querySelectorAll('.barrier-input-item'))
+                    .map((item, idx) => ({
+                        text: (item.querySelector('.preventive-barrier-input')?.value || '').trim(),
+                        eff: item.querySelector('.barrier-effectiveness')?.value || 'medium',
+                        idx
+                    })).filter(b => b.text !== '');
+                causes.push({ name, prob, barriers, refId: group.id });
             });
 
             document.querySelectorAll('.impact-input-group').forEach(group => {
-                const impactName = group.querySelector('.impact-name-input').value || "Consecuencia";
-                const impactRefId = group.id;
-                const impactSeverity = (group.querySelector('.impact-severity')?.value) || 'moderado';
-                const mitigativeItems = Array.from(group.querySelectorAll('.barrier-input-item'));
-                const mitigativeBarriers = mitigativeItems.map(it => {
-                    const txt = (it.querySelector('.mitigative-barrier-input')?.value || '').trim();
-                    const eff = it.querySelector('.barrier-effectiveness')?.value || 'medium';
-                    return { text: txt, eff };
-                }).filter(b => b.text !== "");
-                const impactDiagramItem = document.createElement('div');
-                impactDiagramItem.className = 'impact-item flex flex-col md:flex-row items-center justify-end w-full p-1 gap-1 md:gap-2';
-                let barriersHTML = mitigativeBarriers.length > 0 ? mitigativeBarriers.map((b, idx) => {
-                    const effClass = b.eff === 'high' ? 'eff-high' : (b.eff === 'low' ? 'eff-low' : 'eff-medium');
-                    const effLabel = b.eff === 'high' ? 'Alta' : (b.eff === 'low' ? 'Baja' : 'Media');
-                    return `<div class="flex items-center justify-start w-full">
-                        <div class="barrier-line mitigative-barrier-line mr-1"></div>
-                        <div class="barrier-box bg-rose-50 text-rose-900 border border-rose-200 hover:bg-rose-100 p-1.5 rounded-md text-xs shadow diagram-box flex-1 text-left cursor-pointer transition transform duration-150 ease-out hover:shadow-sm hover:-translate-y-px hover:ring-1 hover:ring-rose-200" onclick="focusBowtieBarrier('${impactRefId}', 'mitigative', ${idx})"><span class=\"eff-dot ${effClass}\" title=\"Efectividad: ${effLabel}\"></span>${b.text}</div>
-                    </div>`;
-                }).join('<div class="h-1"></div>') : '<div class="text-xs text-rose-200 italic text-center w-full">Sin barreras</div>';
-                const sevClass = impactSeverity === 'menor' ? 'impact-minor' : (impactSeverity === 'alto' ? 'impact-high' : (impactSeverity === 'catastrofico' ? 'impact-catastrophic' : 'impact-moderate'));
-                const sevLabel = impactSeverity === 'menor' ? 'Menor' : (impactSeverity === 'alto' ? 'Alto' : (impactSeverity === 'catastrofico' ? 'Catastrófico' : 'Moderado'));
-                impactDiagramItem.innerHTML = `
-                    <div class="mitigative-barriers-diagram-list flex flex-col space-y-0.5 w-full md:w-1/2 order-1 items-stretch">
-                        ${barriersHTML}
-                    </div>
-                    <div class="connector-svg hidden md:flex items-center justify-center md:w-12 order-2" aria-hidden="true">
-                        <svg class="w-12 h-3" viewBox="0 0 48 12">
-                            <line x1="0" y1="6" x2="36" y2="6" stroke="#ffffff" stroke-opacity="0.95" stroke-width="2"></line>
-                            <polygon points="36,2 46,6 36,10" fill="#ffffff" fill-opacity="0.95"></polygon>
-                        </svg>
-                    </div>
-                    <div class="impact-box bg-slate-50 border border-slate-300 text-slate-900 p-2 rounded-lg shadow-md text-center diagram-box w-full md:w-1/2 order-3 cursor-pointer transition duration-150 ease-out transform hover:shadow-md hover:-translate-y-px indicator-left ${sevClass}" title="Impacto: ${sevLabel}" onclick="focusBowtieGroup('${impactRefId}')">${impactName}</div>`;
-                impactsContainerDiagram.appendChild(impactDiagramItem);
+                const name = (group.querySelector('.impact-name-input')?.value || '').trim() || 'Consecuencia';
+                const severity = group.querySelector('.impact-severity')?.value || 'moderado';
+                const barriers = Array.from(group.querySelectorAll('.barrier-input-item'))
+                    .map((item, idx) => ({
+                        text: (item.querySelector('.mitigative-barrier-input')?.value || '').trim(),
+                        eff: item.querySelector('.barrier-effectiveness')?.value || 'medium',
+                        idx
+                    })).filter(b => b.text !== '');
+                impacts.push({ name, severity, barriers, refId: group.id });
             });
-            if (scrollIntoView && document.getElementById('bowtieDiagramVisualization')) {
-                 document.getElementById('bowtieDiagramVisualization').scrollIntoView({ behavior: 'smooth' });
+
+            // --- Actualizar panel de resumen ---
+            renderRiskSummary(causes, impacts, riskEventName);
+
+            // --- Contenedor ---
+            const container = document.getElementById('bowtieDiagram');
+            container.innerHTML = '';
+
+            // --- Estado vacío ---
+            if (causes.length === 0 && impacts.length === 0) {
+                const empty = document.createElement('div');
+                empty.style.cssText = 'display:flex;align-items:center;justify-content:center;min-height:200px;color:#9ca3af;font-size:14px;';
+                empty.textContent = 'Añade causas y consecuencias arriba para ver el diagrama.';
+                container.appendChild(empty);
+                if (scrollIntoView) document.getElementById('bowtieDiagramVisualization')?.scrollIntoView({ behavior: 'smooth' });
+                return;
             }
+
+            // --- Dimensiones ---
+            const containerW = container.clientWidth || 960;
+            const W = Math.max(960, containerW);
+            const numRows = Math.max(causes.length, impacts.length, 1);
+            const maxB = Math.max(
+                causes.reduce((m, c) => Math.max(m, c.barriers.length), 0),
+                impacts.reduce((m, i) => Math.max(m, i.barriers.length), 0)
+            );
+            const rowH = Math.max(100, 70 + maxB * 18);
+            const H = Math.max(420, numRows * rowH + 100);
+            const cx = W / 2, cy = H / 2;
+            const R = 58;
+            const nodeW = 162, nodeH = 46;
+            const leftNodeX = 16, rightNodeX = W - nodeW - 16;
+
+            function getNodeCY(i, total) {
+                if (total <= 1) return cy;
+                const span = Math.min(H - 130, rowH * (total - 1));
+                return cy - span / 2 + i * (span / (total - 1));
+            }
+
+            // --- Paletas ---
+            const probColors  = { improbable: '#52c41a', posible: '#faad14', probable: '#ff7a00', altamente: '#f5222d' };
+            const sevColors   = { menor: '#52c41a', moderado: '#faad14', alto: '#ff7a00', catastrofico: '#f5222d' };
+            const probBg      = { improbable: '#f6ffed', posible: '#fffbe6', probable: '#fff2e8', altamente: '#fff1f0' };
+            const sevBg       = { menor: '#f6ffed', moderado: '#fffbe6', alto: '#fff2e8', catastrofico: '#fff1f0' };
+            const probLabels  = { improbable: 'Improbable', posible: 'Posible', probable: 'Probable', altamente: 'Alt. probable' };
+            const sevLabels   = { menor: 'Menor', moderado: 'Moderado', alto: 'Alto', catastrofico: 'Catastrófico' };
+            const effColors   = { high: '#16a34a', medium: '#f59e0b', low: '#dc2626' };
+            const probScores  = { improbable: 1, posible: 2, probable: 3, altamente: 4 };
+            const sevScores   = { menor: 1, moderado: 2, alto: 3, catastrofico: 4 };
+
+            function riskStroke(score) {
+                if (score >= 9) return { color: '#f5222d', width: 3 };
+                if (score >= 4) return { color: '#ff7a00', width: 2.5 };
+                return { color: '#52c41a', width: 2 };
+            }
+            function trunc(s, max) {
+                if (!s) return '';
+                return s.length > max ? s.slice(0, max - 1) + '\u2026' : s;
+            }
+
+            // --- Helpers SVG ---
+            const NS = 'http://www.w3.org/2000/svg';
+            function el(tag, attrs) {
+                const e = document.createElementNS(NS, tag);
+                if (attrs) for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+                return e;
+            }
+            function txt(content, attrs) {
+                const t = el('text', attrs);
+                t.textContent = content;
+                return t;
+            }
+
+            // --- Crear SVG ---
+            const svg = el('svg', {
+                width: W, height: H,
+                viewBox: `0 0 ${W} ${H}`,
+                style: 'display:block;font-family:Inter,system-ui,sans-serif;'
+            });
+
+            // Fondo
+            svg.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: '#fafafa', rx: 10 }));
+
+            // Triángulos decorativos
+            if (causes.length > 0) {
+                const y0 = getNodeCY(0, causes.length), y1 = getNodeCY(causes.length - 1, causes.length);
+                svg.appendChild(el('polygon', {
+                    points: `${leftNodeX + nodeW},${y0} ${cx - R},${cy} ${leftNodeX + nodeW},${y1}`,
+                    fill: 'rgba(255,241,89,0.13)', stroke: 'none'
+                }));
+            }
+            if (impacts.length > 0) {
+                const y0 = getNodeCY(0, impacts.length), y1 = getNodeCY(impacts.length - 1, impacts.length);
+                svg.appendChild(el('polygon', {
+                    points: `${rightNodeX},${y0} ${cx + R},${cy} ${rightNodeX},${y1}`,
+                    fill: 'rgba(245,34,45,0.05)', stroke: 'none'
+                }));
+            }
+
+            // Etiquetas de zona
+            if (causes.length > 0) {
+                const topY = getNodeCY(0, causes.length);
+                svg.appendChild(txt('CAUSAS', { x: leftNodeX + nodeW / 2, y: Math.max(18, topY - 28), 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, 'letter-spacing': 1.5, fill: '#888' }));
+            }
+            if (impacts.length > 0) {
+                const topY = getNodeCY(0, impacts.length);
+                svg.appendChild(txt('CONSECUENCIAS', { x: rightNodeX + nodeW / 2, y: Math.max(18, topY - 28), 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, 'letter-spacing': 1.5, fill: '#888' }));
+            }
+
+            // --- Grupos de pathways (para resaltado con hover) ---
+            const pathGroups = [];
+
+            // Helper: dibuja un pathway con barreras (como gates sobre la línea)
+            function buildPathGroup(x1, y1, x2, y2, nodeBarriers, nodeRefId, barrierSide, lineStroke) {
+                const g = el('g', { style: 'cursor:default' });
+                const dx = x2 - x1, dy = y2 - y1;
+                const lineLen = Math.sqrt(dx * dx + dy * dy) || 1;
+                const ux = dx / lineLen, uy = dy / lineLen;
+                const pathAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+                const N = nodeBarriers.length;
+
+                // Puntos de barrera a lo largo de la línea
+                const bPoints = nodeBarriers.map((b, k) => {
+                    const t = (k + 1) / (N + 1);
+                    return { bx: x1 + t * dx, by: y1 + t * dy, barrier: b };
+                });
+
+                // Segmentos de línea (con huecos en las barreras)
+                const halfGap = 5;
+                function drawSeg(sx, sy, ex, ey) {
+                    g.appendChild(el('line', { x1: sx, y1: sy, x2: ex, y2: ey,
+                        stroke: lineStroke.color, 'stroke-width': lineStroke.width,
+                        'stroke-opacity': 0.7, 'stroke-linecap': 'round' }));
+                }
+                if (N === 0) {
+                    drawSeg(x1, y1, x2, y2);
+                } else {
+                    drawSeg(x1, y1, bPoints[0].bx - halfGap * ux, bPoints[0].by - halfGap * uy);
+                    for (let k = 0; k < N - 1; k++) {
+                        drawSeg(bPoints[k].bx + halfGap * ux, bPoints[k].by + halfGap * uy,
+                                bPoints[k + 1].bx - halfGap * ux, bPoints[k + 1].by - halfGap * uy);
+                    }
+                    drawSeg(bPoints[N - 1].bx + halfGap * ux, bPoints[N - 1].by + halfGap * uy, x2, y2);
+                }
+
+                // Barreras
+                bPoints.forEach(({ bx, by, barrier }) => {
+                    const effColor = effColors[barrier.eff] || effColors.medium;
+                    const effLabel = barrier.eff === 'high' ? 'Alta' : barrier.eff === 'low' ? 'Baja' : 'Media';
+                    const bg = el('g', { style: 'cursor:pointer' });
+                    bg.addEventListener('click', (e) => { e.stopPropagation(); focusBowtieBarrier(nodeRefId, barrierSide, barrier.idx); });
+
+                    // Gate: rect delgado perpendicular al path
+                    bg.appendChild(el('rect', { x: -5, y: -20, width: 10, height: 40, rx: 2,
+                        fill: '#fafafa',
+                        transform: `translate(${bx},${by}) rotate(${pathAngle})` }));
+                    bg.appendChild(el('rect', { x: -4, y: -19, width: 8, height: 38, rx: 2,
+                        fill: effColor, 'fill-opacity': 0.88,
+                        transform: `translate(${bx},${by}) rotate(${pathAngle})` }));
+
+                    // Label flotante: causa → arriba (perpendicular "above"), consecuencia → abajo
+                    // "Above" perp dir: (uy, -ux); "Below": (-uy, ux)
+                    const sign = barrierSide === 'preventive' ? 1 : -1;
+                    const dist = 46;
+                    const lx = bx + sign * uy * dist;
+                    const ly = by - sign * ux * dist;
+                    const lW = 84, lH = 26;
+
+                    // Connector
+                    bg.appendChild(el('line', {
+                        x1: bx + sign * uy * 22, y1: by - sign * ux * 22,
+                        x2: lx, y2: ly + (ly < by ? lH / 2 : -lH / 2),
+                        stroke: effColor, 'stroke-width': 1, 'stroke-dasharray': '3,2', 'stroke-opacity': 0.55
+                    }));
+
+                    // Shadow
+                    bg.appendChild(el('rect', { x: lx - lW / 2 + 1, y: ly - lH / 2 + 1, width: lW, height: lH, rx: 4, fill: 'rgba(0,0,0,0.07)' }));
+                    // Box
+                    bg.appendChild(el('rect', { x: lx - lW / 2, y: ly - lH / 2, width: lW, height: lH, rx: 4, fill: '#ffffff', stroke: effColor, 'stroke-width': 1.5 }));
+                    // Eff dot
+                    bg.appendChild(el('circle', { cx: lx - lW / 2 + 10, cy: ly, r: 3.5, fill: effColor }));
+                    // Text
+                    const te = txt(trunc(barrier.text, 9), {
+                        x: lx - lW / 2 + 19, y: ly + 4,
+                        'font-size': 10, fill: '#1a1a1a', 'text-anchor': 'start',
+                        style: 'pointer-events:none'
+                    });
+                    bg.appendChild(te);
+
+                    // SVG title tooltip (full text)
+                    const titleEl = document.createElementNS(NS, 'title');
+                    titleEl.textContent = `${barrier.text}\nEfectividad: ${effLabel}`;
+                    bg.appendChild(titleEl);
+
+                    g.appendChild(bg);
+                });
+
+                // Área invisible para hover
+                g.appendChild(el('line', { x1, y1, x2, y2, stroke: 'transparent', 'stroke-width': 22 }));
+                return g;
+            }
+
+            // --- Pathways de causas ---
+            causes.forEach((cause, i) => {
+                const causeCY = getNodeCY(i, causes.length);
+                const pScore = probScores[cause.prob] || 2;
+                const ls = riskStroke(pScore * pScore);
+                const g = buildPathGroup(leftNodeX + nodeW, causeCY, cx - R, cy, cause.barriers, cause.refId, 'preventive', ls);
+                pathGroups.push(g);
+                svg.appendChild(g);
+            });
+
+            // --- Pathways de consecuencias ---
+            impacts.forEach((impact, i) => {
+                const impactCY = getNodeCY(i, impacts.length);
+                const sScore = sevScores[impact.severity] || 2;
+                const ls = riskStroke(sScore * sScore);
+                const g = buildPathGroup(cx + R, cy, rightNodeX, impactCY, impact.barriers, impact.refId, 'mitigative', ls);
+                pathGroups.push(g);
+                svg.appendChild(g);
+            });
+
+            // Hover: resaltar pathway activo, atenuar los demás
+            pathGroups.forEach((g, idx) => {
+                g.addEventListener('mouseenter', () => {
+                    pathGroups.forEach((other, j) => { other.style.opacity = j === idx ? '1' : '0.18'; });
+                });
+                g.addEventListener('mouseleave', () => {
+                    pathGroups.forEach(other => { other.style.opacity = ''; });
+                });
+            });
+
+            // --- Evento central (encima de todo) ---
+            const eventGroup = el('g', { style: 'cursor:default' });
+            eventGroup.appendChild(el('circle', { cx, cy, r: R + 3, fill: 'rgba(255,255,255,0.6)', stroke: 'none' }));
+            eventGroup.appendChild(el('circle', { cx, cy, r: R, fill: '#FFF159', stroke: '#333333', 'stroke-width': 2.5 }));
+
+            // Texto del evento (word-wrap manual)
+            const words = riskEventName.split(' ');
+            const maxChars = 13;
+            const lines = [];
+            let cur = '';
+            words.forEach(w => {
+                if ((cur + (cur ? ' ' : '') + w).length > maxChars && cur) { lines.push(cur); cur = w; }
+                else { cur = cur ? cur + ' ' + w : w; }
+            });
+            if (cur) lines.push(cur);
+            if (lines.length > 3) { lines.splice(3); lines[2] = lines[2].slice(0, 11) + '\u2026'; }
+            const lh = 16, ty0 = cy - ((lines.length - 1) * lh) / 2;
+            const evTxt = el('text', { x: cx, y: ty0, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 700, fill: '#1a1a1a', style: 'pointer-events:none' });
+            lines.forEach((line, i) => {
+                const sp = el('tspan', { x: cx, dy: i === 0 ? 0 : lh });
+                sp.textContent = line;
+                evTxt.appendChild(sp);
+            });
+            eventGroup.appendChild(evTxt);
+            svg.appendChild(eventGroup);
+
+            // --- Nodos de causa ---
+            causes.forEach((cause, i) => {
+                const ncy = getNodeCY(i, causes.length);
+                const color = probColors[cause.prob] || '#faad14';
+                const bg = probBg[cause.prob] || '#fffbe6';
+                const label = probLabels[cause.prob] || cause.prob;
+                const g = el('g', { style: 'cursor:pointer' });
+                g.addEventListener('click', () => focusBowtieGroup(cause.refId));
+                g.appendChild(el('rect', { x: leftNodeX + 1, y: ncy - nodeH / 2 + 1, width: nodeW, height: nodeH, rx: 6, fill: 'rgba(0,0,0,0.07)' }));
+                g.appendChild(el('rect', { x: leftNodeX, y: ncy - nodeH / 2, width: nodeW, height: nodeH, rx: 6, fill: bg, stroke: color, 'stroke-width': 1.5 }));
+                g.appendChild(el('rect', { x: leftNodeX, y: ncy - nodeH / 2, width: 6, height: nodeH, rx: 3, fill: color }));
+                const nt = txt(trunc(cause.name, 18), { x: leftNodeX + 14, y: ncy - 5, 'font-size': 11, 'font-weight': 600, fill: '#1a1a1a', style: 'pointer-events:none' });
+                g.appendChild(nt);
+                const pl = txt(label, { x: leftNodeX + 14, y: ncy + 10, 'font-size': 9, fill: color, style: 'pointer-events:none' });
+                g.appendChild(pl);
+                svg.appendChild(g);
+            });
+
+            // --- Nodos de consecuencia ---
+            impacts.forEach((impact, i) => {
+                const ncy = getNodeCY(i, impacts.length);
+                const color = sevColors[impact.severity] || '#faad14';
+                const bg = sevBg[impact.severity] || '#fffbe6';
+                const label = sevLabels[impact.severity] || impact.severity;
+                const g = el('g', { style: 'cursor:pointer' });
+                g.addEventListener('click', () => focusBowtieGroup(impact.refId));
+                g.appendChild(el('rect', { x: rightNodeX + 1, y: ncy - nodeH / 2 + 1, width: nodeW, height: nodeH, rx: 6, fill: 'rgba(0,0,0,0.07)' }));
+                g.appendChild(el('rect', { x: rightNodeX, y: ncy - nodeH / 2, width: nodeW, height: nodeH, rx: 6, fill: bg, stroke: color, 'stroke-width': 1.5 }));
+                g.appendChild(el('rect', { x: rightNodeX + nodeW - 6, y: ncy - nodeH / 2, width: 6, height: nodeH, rx: 3, fill: color }));
+                const nt = txt(trunc(impact.name, 18), { x: rightNodeX + 10, y: ncy - 5, 'font-size': 11, 'font-weight': 600, fill: '#1a1a1a', style: 'pointer-events:none' });
+                g.appendChild(nt);
+                const sl = txt(label, { x: rightNodeX + 10, y: ncy + 10, 'font-size': 9, fill: color, style: 'pointer-events:none' });
+                g.appendChild(sl);
+                svg.appendChild(g);
+            });
+
+            container.appendChild(svg);
+
+            if (scrollIntoView && document.getElementById('bowtieDiagramVisualization')) {
+                document.getElementById('bowtieDiagramVisualization').scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // --- Panel de resumen de riesgo con alertas accionables ---
+        function renderRiskSummary(causes, impacts, riskEventName) {
+            const panel = document.getElementById('bowtieRiskSummary');
+            if (!panel) return;
+
+            if (causes.length === 0 && impacts.length === 0) { panel.innerHTML = ''; return; }
+
+            const probScores = { improbable: 1, posible: 2, probable: 3, altamente: 4 };
+            const sevScores  = { menor: 1, moderado: 2, alto: 3, catastrofico: 4 };
+            const probLabels = { improbable: 'Improbable', posible: 'Posible', probable: 'Probable', altamente: 'Altamente probable' };
+            const sevLabels  = { menor: 'Menor', moderado: 'Moderado', alto: 'Alto', catastrofico: 'Catastrófico' };
+
+            // Métricas
+            const totalBarriers = causes.reduce((s, c) => s + c.barriers.length, 0) + impacts.reduce((s, i) => s + i.barriers.length, 0);
+            const highB  = [...causes, ...impacts].flatMap(n => n.barriers).filter(b => b.eff === 'high').length;
+            const medB   = [...causes, ...impacts].flatMap(n => n.barriers).filter(b => b.eff === 'medium').length;
+            const lowB   = [...causes, ...impacts].flatMap(n => n.barriers).filter(b => b.eff === 'low').length;
+
+            // Alertas
+            const alerts = [];
+
+            // 1. Causas sin barreras
+            causes.filter(c => c.barriers.length === 0).forEach(c => {
+                alerts.push({ level: 'critical', html: `Causa <strong>"${c.name}"</strong> (${probLabels[c.prob]}) no tiene barreras preventivas.` });
+            });
+
+            // 2. Consecuencias sin barreras
+            impacts.filter(i => i.barriers.length === 0).forEach(i => {
+                alerts.push({ level: 'critical', html: `Consecuencia <strong>"${i.name}"</strong> (${sevLabels[i.severity]}) no tiene barreras mitigativas.` });
+            });
+
+            // 3. Causas de alta probabilidad sin barrera efectiva alta
+            causes.filter(c => ['probable','altamente'].includes(c.prob) && !c.barriers.some(b => b.eff === 'high')).forEach(c => {
+                alerts.push({ level: 'warning', html: `Causa <strong>"${c.name}"</strong> tiene ${probLabels[c.prob]} probabilidad pero ninguna barrera de alta efectividad.` });
+            });
+
+            // 4. Consecuencias graves sin barrera efectiva alta
+            impacts.filter(i => ['alto','catastrofico'].includes(i.severity) && !i.barriers.some(b => b.eff === 'high')).forEach(i => {
+                alerts.push({ level: 'warning', html: `Consecuencia <strong>"${i.name}"</strong> con impacto ${sevLabels[i.severity]} no tiene barreras de alta efectividad.` });
+            });
+
+            // 5. Causas con barreras pero todas de baja efectividad
+            causes.filter(c => c.barriers.length > 0 && c.barriers.every(b => b.eff === 'low') && !['probable','altamente'].includes(c.prob)).forEach(c => {
+                alerts.push({ level: 'warning', html: `Causa <strong>"${c.name}"</strong>: todas sus barreras preventivas son de baja efectividad.` });
+            });
+
+            // 6. Consecuencias con barreras pero todas de baja efectividad
+            impacts.filter(i => i.barriers.length > 0 && i.barriers.every(b => b.eff === 'low') && !['alto','catastrofico'].includes(i.severity)).forEach(i => {
+                alerts.push({ level: 'warning', html: `Consecuencia <strong>"${i.name}"</strong>: todas sus barreras mitigativas son de baja efectividad.` });
+            });
+
+            // 7. Path de mayor riesgo (prob × severidad)
+            let maxScore = 0, maxPath = null;
+            causes.forEach(c => {
+                impacts.forEach(i => {
+                    const score = (probScores[c.prob] || 2) * (sevScores[i.severity] || 2);
+                    if (score > maxScore) { maxScore = score; maxPath = { cause: c, impact: i, score }; }
+                });
+            });
+            if (maxPath) {
+                const scoreLabel = maxScore >= 9 ? 'ALTO' : maxScore >= 4 ? 'MEDIO' : 'BAJO';
+                const lvl = maxScore >= 9 ? 'critical' : maxScore >= 4 ? 'warning' : 'info';
+                alerts.push({ level: lvl, html: `Path más crítico: <strong>"${maxPath.cause.name}"</strong> → ${riskEventName} → <strong>"${maxPath.impact.name}"</strong> — Riesgo: <strong>${scoreLabel} (${maxScore}/16)</strong>` });
+            }
+
+            // 8. Situaciones favorables
+            if (causes.length > 0 && causes.every(c => c.barriers.length > 0 && c.barriers.some(b => b.eff === 'high'))) {
+                alerts.push({ level: 'good', html: 'Todas las causas tienen al menos una barrera preventiva de alta efectividad.' });
+            }
+            if (impacts.length > 0 && impacts.every(i => i.barriers.length > 0 && i.barriers.some(b => b.eff === 'high'))) {
+                alerts.push({ level: 'good', html: 'Todas las consecuencias tienen al menos una barrera mitigativa de alta efectividad.' });
+            }
+            if (alerts.length === 0) {
+                alerts.push({ level: 'good', html: 'No se detectaron alertas críticas en el análisis actual.' });
+            }
+
+            // Ordenar: critical → warning → info → good
+            const order = { critical: 0, warning: 1, info: 2, good: 3 };
+            alerts.sort((a, b) => (order[a.level] ?? 4) - (order[b.level] ?? 4));
+
+            const alertsHTML = alerts.map(a => `
+                <div class="risk-alert">
+                    <span class="risk-alert-dot ${a.level}"></span>
+                    <span>${a.html}</span>
+                </div>`).join('');
+
+            panel.innerHTML = `
+                <div class="risk-summary-header">
+                    <span style="font-size:13px;font-weight:700;color:#333;">Análisis de Riesgo</span>
+                    <span style="flex:1"></span>
+                    <span class="risk-metric-chip">${causes.length} causa${causes.length !== 1 ? 's' : ''}</span>
+                    <span class="risk-metric-chip">${impacts.length} consecuencia${impacts.length !== 1 ? 's' : ''}</span>
+                    <span class="risk-metric-chip">${totalBarriers} barrera${totalBarriers !== 1 ? 's' : ''}</span>
+                    ${highB > 0 ? `<span class="risk-metric-chip" style="border-color:#16a34a;color:#16a34a;">${highB} alta</span>` : ''}
+                    ${medB > 0 ? `<span class="risk-metric-chip" style="border-color:#f59e0b;color:#b45309;">${medB} media</span>` : ''}
+                    ${lowB > 0 ? `<span class="risk-metric-chip" style="border-color:#dc2626;color:#dc2626;">${lowB} baja</span>` : ''}
+                </div>
+                <div class="risk-summary-body">
+                    ${alertsHTML}
+                </div>`;
         }
         
         // --- Edición desde el diagrama: helpers para enfocar campos originales ---
@@ -1842,9 +2170,10 @@
             document.getElementById('riskEvent').value = '';
             document.getElementById('causesContainer').innerHTML = '';
             document.getElementById('impactsContainer').innerHTML = '';
-            document.getElementById('causesContainerForDiagram').innerHTML = '';
-            document.getElementById('impactsContainerForDiagram').innerHTML = '';
-            document.getElementById('eventBoxDiagram').textContent = 'EVENTO';
+            const bowtieDiagramEl = document.getElementById('bowtieDiagram');
+            if (bowtieDiagramEl) bowtieDiagramEl.innerHTML = '';
+            const riskSummaryEl = document.getElementById('bowtieRiskSummary');
+            if (riskSummaryEl) riskSummaryEl.innerHTML = '';
             causeCounter = 0;
             impactCounter = 0;
             // Limpiar registro de barreras compartidas
