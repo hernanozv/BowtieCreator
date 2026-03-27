@@ -628,7 +628,8 @@
             bowtie: document.getElementById('bowtieContent'),
             fta: document.getElementById('ftaContent')
         };
-        let activeTab = 'bowtie'; 
+        let activeTab = 'bowtie';
+        let residualModeActive = false; // B5: toggle inherente/residual 
 
         function showTab(tabId) {
             activeTab = tabId;
@@ -1687,7 +1688,9 @@
             causes.forEach((cause, i) => {
                 const causeCY = getNodeCY(i, causes.length);
                 const pScore = probScores[cause.prob] || 2;
-                const ls = riskStroke(pScore * pScore);
+                const inherentScore = pScore * pScore;
+                const displayScore = residualModeActive ? inherentScore * calcResidualFactor(cause.barriers) : inherentScore;
+                const ls = riskStroke(displayScore);
                 const g = buildPathGroup(leftNodeX + nodeW, causeCY, cx - R, cy, cause.barriers, cause.refId, 'preventive', ls);
                 pathGroups.push(g);
                 svg.appendChild(g);
@@ -1697,7 +1700,9 @@
             impacts.forEach((impact, i) => {
                 const impactCY = getNodeCY(i, impacts.length);
                 const sScore = sevScores[impact.severity] || 2;
-                const ls = riskStroke(sScore * sScore);
+                const inherentScore = sScore * sScore;
+                const displayScore = residualModeActive ? inherentScore * calcResidualFactor(impact.barriers) : inherentScore;
+                const ls = riskStroke(displayScore);
                 const g = buildPathGroup(cx + R, cy, rightNodeX, impactCY, impact.barriers, impact.refId, 'mitigative', ls);
                 pathGroups.push(g);
                 svg.appendChild(g);
@@ -1817,6 +1822,76 @@
             }
         }
 
+        // =====================================================================
+        // FASE 2: B5 — Factor de riesgo residual por barreras
+        // =====================================================================
+        function calcResidualFactor(barriers) {
+            if (!barriers || barriers.length === 0) return 1;
+            const effMap = { high: 0.8, medium: 0.5, low: 0.2 };
+            return barriers.reduce((r, b) => r * (1 - (effMap[b.eff] || 0.2)), 1);
+        }
+
+        // =====================================================================
+        // FASE 2: B6 — Índice de Efectividad del Portafolio de Barreras (BPEI)
+        // =====================================================================
+        function calcBPEI(causes, impacts) {
+            const probScores = { improbable: 1, posible: 2, probable: 3, altamente: 4 };
+            const sevScores  = { menor: 1, moderado: 2, alto: 3, catastrofico: 4 };
+            let totalInherent = 0, totalResidual = 0;
+            causes.forEach(c => {
+                const inh = Math.pow(probScores[c.prob] || 2, 2);
+                totalInherent += inh;
+                totalResidual += inh * calcResidualFactor(c.barriers);
+            });
+            impacts.forEach(i => {
+                const inh = Math.pow(sevScores[i.severity] || 2, 2);
+                totalInherent += inh;
+                totalResidual += inh * calcResidualFactor(i.barriers);
+            });
+            if (totalInherent === 0) return 0;
+            return Math.round((1 - totalResidual / totalInherent) * 100);
+        }
+
+        // =====================================================================
+        // FASE 2: F19 — Ranking de criticidad de barreras
+        // =====================================================================
+        function calcBarrierCriticality(causes, impacts) {
+            const probScores = { improbable: 1, posible: 2, probable: 3, altamente: 4 };
+            const sevScores  = { menor: 1, moderado: 2, alto: 3, catastrofico: 4 };
+            const rankings = [];
+            causes.forEach(c => {
+                const inh = Math.pow(probScores[c.prob] || 2, 2);
+                const origNodeResidual = inh * calcResidualFactor(c.barriers);
+                c.barriers.forEach((b, idx) => {
+                    const barriersWithout = c.barriers.filter((_, i) => i !== idx);
+                    const newNodeResidual = inh * calcResidualFactor(barriersWithout);
+                    rankings.push({
+                        name: b.text || '(sin nombre)',
+                        eff: b.eff,
+                        type: 'preventiva',
+                        nodeLabel: c.name || '(causa)',
+                        marginalRisk: newNodeResidual - origNodeResidual
+                    });
+                });
+            });
+            impacts.forEach(i => {
+                const inh = Math.pow(sevScores[i.severity] || 2, 2);
+                const origNodeResidual = inh * calcResidualFactor(i.barriers);
+                i.barriers.forEach((b, idx) => {
+                    const barriersWithout = i.barriers.filter((_, j) => j !== idx);
+                    const newNodeResidual = inh * calcResidualFactor(barriersWithout);
+                    rankings.push({
+                        name: b.text || '(sin nombre)',
+                        eff: b.eff,
+                        type: 'mitigante',
+                        nodeLabel: i.name || '(consecuencia)',
+                        marginalRisk: newNodeResidual - origNodeResidual
+                    });
+                });
+            });
+            return rankings.sort((a, b) => b.marginalRisk - a.marginalRisk);
+        }
+
         // --- Panel de resumen de riesgo con alertas accionables ---
         function renderRiskSummary(causes, impacts, riskEventName) {
             const panel = document.getElementById('bowtieRiskSummary');
@@ -1829,11 +1904,17 @@
             const probLabels = { improbable: 'Improbable', posible: 'Posible', probable: 'Probable', altamente: 'Altamente probable' };
             const sevLabels  = { menor: 'Menor', moderado: 'Moderado', alto: 'Alto', catastrofico: 'Catastrófico' };
 
-            // Métricas
+            // Métricas básicas
             const totalBarriers = causes.reduce((s, c) => s + c.barriers.length, 0) + impacts.reduce((s, i) => s + i.barriers.length, 0);
             const highB  = [...causes, ...impacts].flatMap(n => n.barriers).filter(b => b.eff === 'high').length;
             const medB   = [...causes, ...impacts].flatMap(n => n.barriers).filter(b => b.eff === 'medium').length;
             const lowB   = [...causes, ...impacts].flatMap(n => n.barriers).filter(b => b.eff === 'low').length;
+
+            // B6: BPEI
+            const bpei = calcBPEI(causes, impacts);
+            const bpeiColor = bpei >= 70 ? '#16a34a' : bpei >= 40 ? '#b45309' : '#dc2626';
+            const bpeiBg    = bpei >= 70 ? '#dcfce7' : bpei >= 40 ? '#fef9c3' : '#fee2e2';
+            const bpeiBorder= bpei >= 70 ? '#86efac' : bpei >= 40 ? '#fde68a' : '#fca5a5';
 
             // Alertas
             const alerts = [];
@@ -1912,20 +1993,146 @@
                     <span>${a.html}</span>
                 </div>`).join('');
 
+            // B5: Toggle botón inherente/residual
+            const toggleBtnLabel = residualModeActive ? 'Ver Riesgo Inherente' : 'Ver Riesgo Residual';
+            const toggleBtnStyle = residualModeActive
+                ? 'background:#dcfce7;border:1px solid #86efac;color:#166534;'
+                : 'background:#f5f5f5;border:1px solid #e5e7eb;color:#555;';
+
+            // B4: Construir matriz 4x4
+            const probKeys = ['improbable','posible','probable','altamente'];
+            const sevKeys  = ['menor','moderado','alto','catastrofico'];
+            const probRowLabels = ['Altamente Probable','Probable','Posible','Improbable'];
+            const sevColLabels  = ['Menor','Moderado','Alto','Catastrófico'];
+            // Contar pathways por celda (prob × sev)
+            const matrixCounts = {};
+            causes.forEach(c => {
+                const p = probScores[c.prob] || 2;
+                impacts.forEach(i => {
+                    const s = sevScores[i.severity] || 2;
+                    const key = `${p}_${s}`;
+                    // Si modo residual, usar scores residuales para asignar la celda correcta
+                    if (residualModeActive) {
+                        const resScore = p * p * calcResidualFactor(c.barriers) + s * s * calcResidualFactor(i.barriers);
+                        // Para la matriz en modo residual, mantenemos las mismas celdas p×s
+                        // pero mostramos el score residual del pathway
+                        matrixCounts[key] = (matrixCounts[key] || { count: 0, resTotal: 0 });
+                        matrixCounts[key].count++;
+                        matrixCounts[key].resTotal += (p * p * calcResidualFactor(c.barriers));
+                    } else {
+                        matrixCounts[key] = (matrixCounts[key] || { count: 0, resTotal: 0 });
+                        matrixCounts[key].count++;
+                    }
+                });
+            });
+
+            function matrixCellBg(p, s) {
+                const score = p * s;
+                if (score >= 12) return '#fca5a5';
+                if (score >= 8)  return '#fdba74';
+                if (score >= 4)  return '#fde68a';
+                return '#bbf7d0';
+            }
+
+            let matrixRowsHTML = '';
+            for (let pi = 3; pi >= 0; pi--) {
+                const p = pi + 1;
+                const pKey = probKeys[pi];
+                let rowHTML = `<td style="font-size:10px;color:#555;padding:3px 5px;white-space:nowrap;font-weight:600;min-width:80px;">${probRowLabels[3 - pi]}</td>`;
+                for (let si = 0; si < 4; si++) {
+                    const s = si + 1;
+                    const key = `${p}_${s}`;
+                    const cell = matrixCounts[key] || { count: 0 };
+                    const bg = matrixCellBg(p, s);
+                    const hasPathways = cell.count > 0;
+                    rowHTML += `<td style="width:44px;height:38px;text-align:center;background:${bg};border:1px solid rgba(0,0,0,0.07);font-size:${hasPathways ? 14 : 11}px;font-weight:${hasPathways ? 700 : 400};color:${hasPathways ? '#1a1a1a' : '#ccc'};cursor:${hasPathways ? 'default' : 'default'};">${hasPathways ? cell.count : ''}</td>`;
+                }
+                matrixRowsHTML += `<tr>${rowHTML}</tr>`;
+            }
+            const matrixHeaderHTML = `<tr><td></td>${sevColLabels.map(l => `<td style="font-size:10px;color:#555;padding:3px 5px;text-align:center;font-weight:600;">${l}</td>`).join('')}</tr>`;
+
+            // F19: Criticality table
+            const rankings = calcBarrierCriticality(causes, impacts);
+            let criticalityRowsHTML = '';
+            if (rankings.length === 0) {
+                criticalityRowsHTML = '<tr><td colspan="4" style="font-size:12px;color:#999;padding:8px;text-align:center;">Sin barreras registradas</td></tr>';
+            } else {
+                rankings.forEach((r, idx) => {
+                    const effColor = r.eff === 'high' ? '#16a34a' : r.eff === 'medium' ? '#b45309' : '#dc2626';
+                    const effLabel = r.eff === 'high' ? 'Alta' : r.eff === 'medium' ? 'Media' : 'Baja';
+                    const typeColor = r.type === 'preventiva' ? '#0369a1' : '#7c3aed';
+                    const margLabel = r.marginalRisk.toFixed(2);
+                    const rowBg = idx % 2 === 0 ? '#fff' : '#fafafa';
+                    criticalityRowsHTML += `<tr style="background:${rowBg};">
+                        <td style="padding:5px 7px;font-size:11px;font-weight:600;color:#1a1a1a;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.name}">${r.name}</td>
+                        <td style="padding:5px 7px;font-size:10px;color:#555;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.nodeLabel}">${r.nodeLabel}</td>
+                        <td style="padding:5px 7px;text-align:center;"><span style="font-size:10px;font-weight:700;color:${effColor};background:${effColor}22;border-radius:4px;padding:1px 5px;">${effLabel}</span></td>
+                        <td style="padding:5px 7px;text-align:center;font-size:11px;font-weight:700;color:#333;">${margLabel}</td>
+                    </tr>`;
+                });
+            }
+
+            // Estado colapsado persistente (mantenido en el panel mismo)
+            const prevMatrix = panel.querySelector('.fase2-matrix-body');
+            const matrixOpen = prevMatrix ? prevMatrix.style.display !== 'none' : false;
+            const prevCrit = panel.querySelector('.fase2-criticality-body');
+            const critOpen = prevCrit ? prevCrit.style.display !== 'none' : false;
+
             panel.innerHTML = `
                 <div class="risk-summary-header">
                     <span style="font-size:13px;font-weight:700;color:#333;">Análisis de Riesgo</span>
                     <span style="font-size:11px;color:#777;font-style:italic;margin-left:4px;">${summaryText}</span>
                     <span style="flex:1"></span>
+                    <span title="Índice de Efectividad del Portafolio de Barreras" style="font-size:12px;font-weight:800;padding:3px 10px;border-radius:20px;background:${bpeiBg};color:${bpeiColor};border:1px solid ${bpeiBorder};margin-right:4px;cursor:default;" title="BPEI: Efectividad total del portafolio de barreras">BPEI ${bpei}%</span>
                     <span class="risk-metric-chip">${causes.length} causa${causes.length !== 1 ? 's' : ''}</span>
                     <span class="risk-metric-chip">${impacts.length} consecuencia${impacts.length !== 1 ? 's' : ''}</span>
                     <span class="risk-metric-chip">${totalBarriers} barrera${totalBarriers !== 1 ? 's' : ''}</span>
                     ${highB > 0 ? `<span class="risk-metric-chip" style="border-color:#16a34a;color:#16a34a;">${highB} alta</span>` : ''}
                     ${medB > 0 ? `<span class="risk-metric-chip" style="border-color:#f59e0b;color:#b45309;">${medB} media</span>` : ''}
                     ${lowB > 0 ? `<span class="risk-metric-chip" style="border-color:#dc2626;color:#dc2626;">${lowB} baja</span>` : ''}
+                    <button onclick="residualModeActive=!residualModeActive;renderBowTieDiagram(false);" style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;${toggleBtnStyle}cursor:pointer;margin-left:4px;">${toggleBtnLabel}</button>
                 </div>
                 <div class="risk-summary-body">
                     ${alertsHTML}
+                </div>
+                <div style="border-top:1px solid #f0f0f0;margin-top:0;">
+                    <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';" style="display:flex;align-items:center;gap:6px;padding:8px 14px;cursor:pointer;user-select:none;background:#fafafa;border-bottom:1px solid #f0f0f0;">
+                        <span style="font-size:12px;font-weight:700;color:#444;">Matriz de Riesgo 4×4</span>
+                        <span style="font-size:10px;color:#999;margin-left:4px;">${residualModeActive ? '— modo residual' : '— riesgo inherente'}</span>
+                        <span style="margin-left:auto;font-size:11px;color:#aaa;">▼</span>
+                    </div>
+                    <div class="fase2-matrix-body" style="display:${matrixOpen ? 'block' : 'none'};padding:12px 14px;overflow-x:auto;">
+                        <table style="border-collapse:collapse;font-size:12px;">
+                            <thead>${matrixHeaderHTML}</thead>
+                            <tbody>${matrixRowsHTML}</tbody>
+                        </table>
+                        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+                            <span style="font-size:10px;color:#555;display:flex;align-items:center;gap:3px;"><span style="width:12px;height:12px;background:#bbf7d0;border-radius:2px;display:inline-block;"></span>Bajo (1-3)</span>
+                            <span style="font-size:10px;color:#555;display:flex;align-items:center;gap:3px;"><span style="width:12px;height:12px;background:#fde68a;border-radius:2px;display:inline-block;"></span>Medio (4-7)</span>
+                            <span style="font-size:10px;color:#555;display:flex;align-items:center;gap:3px;"><span style="width:12px;height:12px;background:#fdba74;border-radius:2px;display:inline-block;"></span>Alto (8-11)</span>
+                            <span style="font-size:10px;color:#555;display:flex;align-items:center;gap:3px;"><span style="width:12px;height:12px;background:#fca5a5;border-radius:2px;display:inline-block;"></span>Crítico (12+)</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="border-top:1px solid #f0f0f0;">
+                    <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';" style="display:flex;align-items:center;gap:6px;padding:8px 14px;cursor:pointer;user-select:none;background:#fafafa;border-bottom:1px solid #f0f0f0;">
+                        <span style="font-size:12px;font-weight:700;color:#444;">Criticidad de Barreras</span>
+                        <span style="font-size:10px;color:#999;margin-left:4px;">— impacto marginal al eliminar cada barrera</span>
+                        <span style="margin-left:auto;font-size:11px;color:#aaa;">▼</span>
+                    </div>
+                    <div class="fase2-criticality-body" style="display:${critOpen ? 'block' : 'none'};padding:0 0 8px 0;">
+                        <table style="width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#f5f5f5;border-bottom:1px solid #e5e7eb;">
+                                    <th style="padding:6px 7px;font-size:10px;font-weight:700;color:#555;text-align:left;">Barrera</th>
+                                    <th style="padding:6px 7px;font-size:10px;font-weight:700;color:#555;text-align:left;">Nodo</th>
+                                    <th style="padding:6px 7px;font-size:10px;font-weight:700;color:#555;text-align:center;">Efect.</th>
+                                    <th style="padding:6px 7px;font-size:10px;font-weight:700;color:#555;text-align:center;" title="Incremento de riesgo residual si se elimina esta barrera">ΔRiesgo</th>
+                                </tr>
+                            </thead>
+                            <tbody>${criticalityRowsHTML}</tbody>
+                        </table>
+                    </div>
                 </div>`;
         }
         
