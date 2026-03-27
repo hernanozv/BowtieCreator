@@ -457,6 +457,7 @@
         <header class="text-center mb-6 py-4 corp-header">
             <h1 class="text-3xl md:text-4xl font-bold corp-title">Análisis de Riesgos</h1>
             <p class="corp-subtitle mt-2">Herramienta para Diagramas BowTie y Árboles de Fallos</p>
+            <span id="autosaveIndicator" style="display:block;font-size:11px;color:#999;margin-top:4px;min-height:16px;transition:opacity 1s;opacity:0.5;"></span>
         </header>
 
         <div class="flex flex-col sm:flex-row flex-wrap justify-center items-center space-y-3 sm:space-y-0 sm:space-x-3 mb-8 pb-4 border-b border-gray-200">
@@ -472,6 +473,9 @@
             <input type="file" id="importFile" class="hidden" accept=".xlsx, .xls" onchange="handleCurrentFileImport(event)">
             <button onclick="confirmCurrentReset()" class="action-button action-button-danger">
                 Reiniciar Análisis
+            </button>
+            <button onclick="toggleKeyboardShortcutsOverlay()" class="action-button action-button-secondary" title="Atajos de teclado">
+                ?
             </button>
         </div>
 
@@ -624,7 +628,8 @@
             bowtie: document.getElementById('bowtieContent'),
             fta: document.getElementById('ftaContent')
         };
-        let activeTab = 'bowtie'; 
+        let activeTab = 'bowtie';
+        let residualModeActive = false; // B5: toggle inherente/residual 
 
         function showTab(tabId) {
             activeTab = tabId;
@@ -833,7 +838,9 @@
         }
         const debouncedRenderBowTie = debounce(() => {
             if (activeTab === 'bowtie') {
-                renderBowTieDiagram(false); // no desplazar al diagrama durante auto-actualización
+                renderBowTieDiagram(false);
+                if (typeof autoSaveBowtieState === 'function') autoSaveBowtieState();
+                if (typeof updateBarriersWarnings === 'function') updateBarriersWarnings();
             }
         }, 300);
         // Entradas que deben refrescar el diagrama al escribir
@@ -1681,7 +1688,9 @@
             causes.forEach((cause, i) => {
                 const causeCY = getNodeCY(i, causes.length);
                 const pScore = probScores[cause.prob] || 2;
-                const ls = riskStroke(pScore * pScore);
+                const inherentScore = pScore * pScore;
+                const displayScore = residualModeActive ? inherentScore * calcResidualFactor(cause.barriers) : inherentScore;
+                const ls = riskStroke(displayScore);
                 const g = buildPathGroup(leftNodeX + nodeW, causeCY, cx - R, cy, cause.barriers, cause.refId, 'preventive', ls);
                 pathGroups.push(g);
                 svg.appendChild(g);
@@ -1691,7 +1700,9 @@
             impacts.forEach((impact, i) => {
                 const impactCY = getNodeCY(i, impacts.length);
                 const sScore = sevScores[impact.severity] || 2;
-                const ls = riskStroke(sScore * sScore);
+                const inherentScore = sScore * sScore;
+                const displayScore = residualModeActive ? inherentScore * calcResidualFactor(impact.barriers) : inherentScore;
+                const ls = riskStroke(displayScore);
                 const g = buildPathGroup(cx + R, cy, rightNodeX, impactCY, impact.barriers, impact.refId, 'mitigative', ls);
                 pathGroups.push(g);
                 svg.appendChild(g);
@@ -1760,6 +1771,12 @@
                 g.appendChild(nt);
                 const pl = txt(label, { x: leftNodeX + 14, y: ncy + nodeH / 2 - 9, 'font-size': 9, fill: color, style: 'pointer-events:none' });
                 g.appendChild(pl);
+                // Badge: conteo de barreras (esquina superior derecha del nodo)
+                const bCount = cause.barriers.length;
+                const badgeColor = cause.barriers.some(b => b.eff === 'high') ? '#16a34a' : cause.barriers.some(b => b.eff === 'medium') ? '#f59e0b' : bCount > 0 ? '#dc2626' : '#9ca3af';
+                g.appendChild(el('circle', { cx: leftNodeX + nodeW - 11, cy: ncy - nodeH / 2 + 11, r: 9, fill: badgeColor, style: 'pointer-events:none' }));
+                const bt = el('text', { x: leftNodeX + nodeW - 11, y: ncy - nodeH / 2 + 15, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 700, fill: '#fff', style: 'pointer-events:none' });
+                bt.textContent = String(bCount); g.appendChild(bt);
                 svg.appendChild(g);
             });
 
@@ -1784,6 +1801,12 @@
                 g.appendChild(nt);
                 const sl = txt(label, { x: rightNodeX + 10, y: ncy + nodeH / 2 - 9, 'font-size': 9, fill: color, style: 'pointer-events:none' });
                 g.appendChild(sl);
+                // Badge: conteo de barreras (esquina superior izquierda del nodo consecuencia)
+                const bCount = impact.barriers.length;
+                const badgeColor = impact.barriers.some(b => b.eff === 'high') ? '#16a34a' : impact.barriers.some(b => b.eff === 'medium') ? '#f59e0b' : bCount > 0 ? '#dc2626' : '#9ca3af';
+                g.appendChild(el('circle', { cx: rightNodeX + 11, cy: ncy - nodeH / 2 + 11, r: 9, fill: badgeColor, style: 'pointer-events:none' }));
+                const bt = el('text', { x: rightNodeX + 11, y: ncy - nodeH / 2 + 15, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 700, fill: '#fff', style: 'pointer-events:none' });
+                bt.textContent = String(bCount); g.appendChild(bt);
                 svg.appendChild(g);
             });
 
@@ -1799,6 +1822,76 @@
             }
         }
 
+        // =====================================================================
+        // FASE 2: B5 — Factor de riesgo residual por barreras
+        // =====================================================================
+        function calcResidualFactor(barriers) {
+            if (!barriers || barriers.length === 0) return 1;
+            const effMap = { high: 0.8, medium: 0.5, low: 0.2 };
+            return barriers.reduce((r, b) => r * (1 - (effMap[b.eff] || 0.2)), 1);
+        }
+
+        // =====================================================================
+        // FASE 2: B6 — Índice de Efectividad del Portafolio de Barreras (BPEI)
+        // =====================================================================
+        function calcBPEI(causes, impacts) {
+            const probScores = { improbable: 1, posible: 2, probable: 3, altamente: 4 };
+            const sevScores  = { menor: 1, moderado: 2, alto: 3, catastrofico: 4 };
+            let totalInherent = 0, totalResidual = 0;
+            causes.forEach(c => {
+                const inh = Math.pow(probScores[c.prob] || 2, 2);
+                totalInherent += inh;
+                totalResidual += inh * calcResidualFactor(c.barriers);
+            });
+            impacts.forEach(i => {
+                const inh = Math.pow(sevScores[i.severity] || 2, 2);
+                totalInherent += inh;
+                totalResidual += inh * calcResidualFactor(i.barriers);
+            });
+            if (totalInherent === 0) return 0;
+            return Math.round((1 - totalResidual / totalInherent) * 100);
+        }
+
+        // =====================================================================
+        // FASE 2: F19 — Ranking de criticidad de barreras
+        // =====================================================================
+        function calcBarrierCriticality(causes, impacts) {
+            const probScores = { improbable: 1, posible: 2, probable: 3, altamente: 4 };
+            const sevScores  = { menor: 1, moderado: 2, alto: 3, catastrofico: 4 };
+            const rankings = [];
+            causes.forEach(c => {
+                const inh = Math.pow(probScores[c.prob] || 2, 2);
+                const origNodeResidual = inh * calcResidualFactor(c.barriers);
+                c.barriers.forEach((b, idx) => {
+                    const barriersWithout = c.barriers.filter((_, i) => i !== idx);
+                    const newNodeResidual = inh * calcResidualFactor(barriersWithout);
+                    rankings.push({
+                        name: b.text || '(sin nombre)',
+                        eff: b.eff,
+                        type: 'preventiva',
+                        nodeLabel: c.name || '(causa)',
+                        marginalRisk: newNodeResidual - origNodeResidual
+                    });
+                });
+            });
+            impacts.forEach(i => {
+                const inh = Math.pow(sevScores[i.severity] || 2, 2);
+                const origNodeResidual = inh * calcResidualFactor(i.barriers);
+                i.barriers.forEach((b, idx) => {
+                    const barriersWithout = i.barriers.filter((_, j) => j !== idx);
+                    const newNodeResidual = inh * calcResidualFactor(barriersWithout);
+                    rankings.push({
+                        name: b.text || '(sin nombre)',
+                        eff: b.eff,
+                        type: 'mitigante',
+                        nodeLabel: i.name || '(consecuencia)',
+                        marginalRisk: newNodeResidual - origNodeResidual
+                    });
+                });
+            });
+            return rankings.sort((a, b) => b.marginalRisk - a.marginalRisk);
+        }
+
         // --- Panel de resumen de riesgo con alertas accionables ---
         function renderRiskSummary(causes, impacts, riskEventName) {
             const panel = document.getElementById('bowtieRiskSummary');
@@ -1811,11 +1904,17 @@
             const probLabels = { improbable: 'Improbable', posible: 'Posible', probable: 'Probable', altamente: 'Altamente probable' };
             const sevLabels  = { menor: 'Menor', moderado: 'Moderado', alto: 'Alto', catastrofico: 'Catastrófico' };
 
-            // Métricas
+            // Métricas básicas
             const totalBarriers = causes.reduce((s, c) => s + c.barriers.length, 0) + impacts.reduce((s, i) => s + i.barriers.length, 0);
             const highB  = [...causes, ...impacts].flatMap(n => n.barriers).filter(b => b.eff === 'high').length;
             const medB   = [...causes, ...impacts].flatMap(n => n.barriers).filter(b => b.eff === 'medium').length;
             const lowB   = [...causes, ...impacts].flatMap(n => n.barriers).filter(b => b.eff === 'low').length;
+
+            // B6: BPEI
+            const bpei = calcBPEI(causes, impacts);
+            const bpeiColor = bpei >= 70 ? '#16a34a' : bpei >= 40 ? '#b45309' : '#dc2626';
+            const bpeiBg    = bpei >= 70 ? '#dcfce7' : bpei >= 40 ? '#fef9c3' : '#fee2e2';
+            const bpeiBorder= bpei >= 70 ? '#86efac' : bpei >= 40 ? '#fde68a' : '#fca5a5';
 
             // Alertas
             const alerts = [];
@@ -1894,20 +1993,146 @@
                     <span>${a.html}</span>
                 </div>`).join('');
 
+            // B5: Toggle botón inherente/residual
+            const toggleBtnLabel = residualModeActive ? 'Ver Riesgo Inherente' : 'Ver Riesgo Residual';
+            const toggleBtnStyle = residualModeActive
+                ? 'background:#dcfce7;border:1px solid #86efac;color:#166534;'
+                : 'background:#f5f5f5;border:1px solid #e5e7eb;color:#555;';
+
+            // B4: Construir matriz 4x4
+            const probKeys = ['improbable','posible','probable','altamente'];
+            const sevKeys  = ['menor','moderado','alto','catastrofico'];
+            const probRowLabels = ['Altamente Probable','Probable','Posible','Improbable'];
+            const sevColLabels  = ['Menor','Moderado','Alto','Catastrófico'];
+            // Contar pathways por celda (prob × sev)
+            const matrixCounts = {};
+            causes.forEach(c => {
+                const p = probScores[c.prob] || 2;
+                impacts.forEach(i => {
+                    const s = sevScores[i.severity] || 2;
+                    const key = `${p}_${s}`;
+                    // Si modo residual, usar scores residuales para asignar la celda correcta
+                    if (residualModeActive) {
+                        const resScore = p * p * calcResidualFactor(c.barriers) + s * s * calcResidualFactor(i.barriers);
+                        // Para la matriz en modo residual, mantenemos las mismas celdas p×s
+                        // pero mostramos el score residual del pathway
+                        matrixCounts[key] = (matrixCounts[key] || { count: 0, resTotal: 0 });
+                        matrixCounts[key].count++;
+                        matrixCounts[key].resTotal += (p * p * calcResidualFactor(c.barriers));
+                    } else {
+                        matrixCounts[key] = (matrixCounts[key] || { count: 0, resTotal: 0 });
+                        matrixCounts[key].count++;
+                    }
+                });
+            });
+
+            function matrixCellBg(p, s) {
+                const score = p * s;
+                if (score >= 12) return '#fca5a5';
+                if (score >= 8)  return '#fdba74';
+                if (score >= 4)  return '#fde68a';
+                return '#bbf7d0';
+            }
+
+            let matrixRowsHTML = '';
+            for (let pi = 3; pi >= 0; pi--) {
+                const p = pi + 1;
+                const pKey = probKeys[pi];
+                let rowHTML = `<td style="font-size:10px;color:#555;padding:3px 5px;white-space:nowrap;font-weight:600;min-width:80px;">${probRowLabels[3 - pi]}</td>`;
+                for (let si = 0; si < 4; si++) {
+                    const s = si + 1;
+                    const key = `${p}_${s}`;
+                    const cell = matrixCounts[key] || { count: 0 };
+                    const bg = matrixCellBg(p, s);
+                    const hasPathways = cell.count > 0;
+                    rowHTML += `<td style="width:44px;height:38px;text-align:center;background:${bg};border:1px solid rgba(0,0,0,0.07);font-size:${hasPathways ? 14 : 11}px;font-weight:${hasPathways ? 700 : 400};color:${hasPathways ? '#1a1a1a' : '#ccc'};cursor:${hasPathways ? 'default' : 'default'};">${hasPathways ? cell.count : ''}</td>`;
+                }
+                matrixRowsHTML += `<tr>${rowHTML}</tr>`;
+            }
+            const matrixHeaderHTML = `<tr><td></td>${sevColLabels.map(l => `<td style="font-size:10px;color:#555;padding:3px 5px;text-align:center;font-weight:600;">${l}</td>`).join('')}</tr>`;
+
+            // F19: Criticality table
+            const rankings = calcBarrierCriticality(causes, impacts);
+            let criticalityRowsHTML = '';
+            if (rankings.length === 0) {
+                criticalityRowsHTML = '<tr><td colspan="4" style="font-size:12px;color:#999;padding:8px;text-align:center;">Sin barreras registradas</td></tr>';
+            } else {
+                rankings.forEach((r, idx) => {
+                    const effColor = r.eff === 'high' ? '#16a34a' : r.eff === 'medium' ? '#b45309' : '#dc2626';
+                    const effLabel = r.eff === 'high' ? 'Alta' : r.eff === 'medium' ? 'Media' : 'Baja';
+                    const typeColor = r.type === 'preventiva' ? '#0369a1' : '#7c3aed';
+                    const margLabel = r.marginalRisk.toFixed(2);
+                    const rowBg = idx % 2 === 0 ? '#fff' : '#fafafa';
+                    criticalityRowsHTML += `<tr style="background:${rowBg};">
+                        <td style="padding:5px 7px;font-size:11px;font-weight:600;color:#1a1a1a;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.name}">${r.name}</td>
+                        <td style="padding:5px 7px;font-size:10px;color:#555;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.nodeLabel}">${r.nodeLabel}</td>
+                        <td style="padding:5px 7px;text-align:center;"><span style="font-size:10px;font-weight:700;color:${effColor};background:${effColor}22;border-radius:4px;padding:1px 5px;">${effLabel}</span></td>
+                        <td style="padding:5px 7px;text-align:center;font-size:11px;font-weight:700;color:#333;">${margLabel}</td>
+                    </tr>`;
+                });
+            }
+
+            // Estado colapsado persistente (mantenido en el panel mismo)
+            const prevMatrix = panel.querySelector('.fase2-matrix-body');
+            const matrixOpen = prevMatrix ? prevMatrix.style.display !== 'none' : false;
+            const prevCrit = panel.querySelector('.fase2-criticality-body');
+            const critOpen = prevCrit ? prevCrit.style.display !== 'none' : false;
+
             panel.innerHTML = `
                 <div class="risk-summary-header">
                     <span style="font-size:13px;font-weight:700;color:#333;">Análisis de Riesgo</span>
                     <span style="font-size:11px;color:#777;font-style:italic;margin-left:4px;">${summaryText}</span>
                     <span style="flex:1"></span>
+                    <span title="Índice de Efectividad del Portafolio de Barreras" style="font-size:12px;font-weight:800;padding:3px 10px;border-radius:20px;background:${bpeiBg};color:${bpeiColor};border:1px solid ${bpeiBorder};margin-right:4px;cursor:default;" title="BPEI: Efectividad total del portafolio de barreras">BPEI ${bpei}%</span>
                     <span class="risk-metric-chip">${causes.length} causa${causes.length !== 1 ? 's' : ''}</span>
                     <span class="risk-metric-chip">${impacts.length} consecuencia${impacts.length !== 1 ? 's' : ''}</span>
                     <span class="risk-metric-chip">${totalBarriers} barrera${totalBarriers !== 1 ? 's' : ''}</span>
                     ${highB > 0 ? `<span class="risk-metric-chip" style="border-color:#16a34a;color:#16a34a;">${highB} alta</span>` : ''}
                     ${medB > 0 ? `<span class="risk-metric-chip" style="border-color:#f59e0b;color:#b45309;">${medB} media</span>` : ''}
                     ${lowB > 0 ? `<span class="risk-metric-chip" style="border-color:#dc2626;color:#dc2626;">${lowB} baja</span>` : ''}
+                    <button onclick="residualModeActive=!residualModeActive;renderBowTieDiagram(false);" style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;${toggleBtnStyle}cursor:pointer;margin-left:4px;">${toggleBtnLabel}</button>
                 </div>
                 <div class="risk-summary-body">
                     ${alertsHTML}
+                </div>
+                <div style="border-top:1px solid #f0f0f0;margin-top:0;">
+                    <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';" style="display:flex;align-items:center;gap:6px;padding:8px 14px;cursor:pointer;user-select:none;background:#fafafa;border-bottom:1px solid #f0f0f0;">
+                        <span style="font-size:12px;font-weight:700;color:#444;">Matriz de Riesgo 4×4</span>
+                        <span style="font-size:10px;color:#999;margin-left:4px;">${residualModeActive ? '— modo residual' : '— riesgo inherente'}</span>
+                        <span style="margin-left:auto;font-size:11px;color:#aaa;">▼</span>
+                    </div>
+                    <div class="fase2-matrix-body" style="display:${matrixOpen ? 'block' : 'none'};padding:12px 14px;overflow-x:auto;">
+                        <table style="border-collapse:collapse;font-size:12px;">
+                            <thead>${matrixHeaderHTML}</thead>
+                            <tbody>${matrixRowsHTML}</tbody>
+                        </table>
+                        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+                            <span style="font-size:10px;color:#555;display:flex;align-items:center;gap:3px;"><span style="width:12px;height:12px;background:#bbf7d0;border-radius:2px;display:inline-block;"></span>Bajo (1-3)</span>
+                            <span style="font-size:10px;color:#555;display:flex;align-items:center;gap:3px;"><span style="width:12px;height:12px;background:#fde68a;border-radius:2px;display:inline-block;"></span>Medio (4-7)</span>
+                            <span style="font-size:10px;color:#555;display:flex;align-items:center;gap:3px;"><span style="width:12px;height:12px;background:#fdba74;border-radius:2px;display:inline-block;"></span>Alto (8-11)</span>
+                            <span style="font-size:10px;color:#555;display:flex;align-items:center;gap:3px;"><span style="width:12px;height:12px;background:#fca5a5;border-radius:2px;display:inline-block;"></span>Crítico (12+)</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="border-top:1px solid #f0f0f0;">
+                    <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';" style="display:flex;align-items:center;gap:6px;padding:8px 14px;cursor:pointer;user-select:none;background:#fafafa;border-bottom:1px solid #f0f0f0;">
+                        <span style="font-size:12px;font-weight:700;color:#444;">Criticidad de Barreras</span>
+                        <span style="font-size:10px;color:#999;margin-left:4px;">— impacto marginal al eliminar cada barrera</span>
+                        <span style="margin-left:auto;font-size:11px;color:#aaa;">▼</span>
+                    </div>
+                    <div class="fase2-criticality-body" style="display:${critOpen ? 'block' : 'none'};padding:0 0 8px 0;">
+                        <table style="width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#f5f5f5;border-bottom:1px solid #e5e7eb;">
+                                    <th style="padding:6px 7px;font-size:10px;font-weight:700;color:#555;text-align:left;">Barrera</th>
+                                    <th style="padding:6px 7px;font-size:10px;font-weight:700;color:#555;text-align:left;">Nodo</th>
+                                    <th style="padding:6px 7px;font-size:10px;font-weight:700;color:#555;text-align:center;">Efect.</th>
+                                    <th style="padding:6px 7px;font-size:10px;font-weight:700;color:#555;text-align:center;" title="Incremento de riesgo residual si se elimina esta barrera">ΔRiesgo</th>
+                                </tr>
+                            </thead>
+                            <tbody>${criticalityRowsHTML}</tbody>
+                        </table>
+                    </div>
                 </div>`;
         }
         
@@ -2346,6 +2571,10 @@
             if (typeof closeAnyOpenBarrierPicker === 'function') closeAnyOpenBarrierPicker();
             if (typeof barrierRegistryAll !== 'undefined') barrierRegistryAll.clear();
             if (typeof barrierIdCounterAll !== 'undefined') barrierIdCounterAll = 0;
+            // Limpiar auto-guardado
+            try { localStorage.removeItem('bowtie_autosave'); } catch(e) {}
+            const ind = document.getElementById('autosaveIndicator');
+            if (ind) ind.textContent = '';
         }
 
         function executeResetFtaAnalysis() {
@@ -2364,6 +2593,7 @@
         
         function exportCurrentAnalysis() {
             if (activeTab === 'bowtie') {
+                if (typeof validateBowtieInputs === 'function') validateBowtieInputs();
                 exportBowTieToXLSX();
             } else if (activeTab === 'fta') {
                 exportFtaToXLSX();
@@ -2596,6 +2826,244 @@
                 renderFtaDiagram();
             }
         }
+
+        // =====================================================================
+        // FASE 1: D11 — Auto-guardado en localStorage
+        // =====================================================================
+        function serializeBowtieState() {
+            const state = { riskEvent: document.getElementById('riskEvent').value, causes: [], impacts: [] };
+            document.querySelectorAll('.cause-input-group').forEach(group => {
+                const name = (group.querySelector('.cause-name-input') || {}).value || '';
+                const prob = (group.querySelector('.cause-probability') || {}).value || 'posible';
+                const barriers = [];
+                group.querySelectorAll('.barrier-input-item').forEach(item => {
+                    const inp = item.querySelector('.preventive-barrier-input');
+                    if (inp) barriers.push({ text: inp.value, eff: (item.querySelector('.barrier-effectiveness') || {}).value || 'medium', barrierId: inp.dataset.barrierId || '' });
+                });
+                state.causes.push({ name, prob, barriers });
+            });
+            document.querySelectorAll('.impact-input-group').forEach(group => {
+                const name = (group.querySelector('.impact-name-input') || {}).value || '';
+                const sev = (group.querySelector('.impact-severity') || {}).value || 'moderado';
+                const barriers = [];
+                group.querySelectorAll('.barrier-input-item').forEach(item => {
+                    const inp = item.querySelector('.mitigative-barrier-input');
+                    if (inp) barriers.push({ text: inp.value, eff: (item.querySelector('.barrier-effectiveness') || {}).value || 'medium', barrierId: inp.dataset.barrierId || '' });
+                });
+                state.impacts.push({ name, sev, barriers });
+            });
+            return state;
+        }
+
+        function deserializeBowtieState(state) {
+            if (!state) return;
+            // Reset silently (no localStorage clear)
+            document.getElementById('riskEvent').value = '';
+            document.getElementById('causesContainer').innerHTML = '';
+            document.getElementById('impactsContainer').innerHTML = '';
+            causeCounter = 0; impactCounter = 0;
+            if (typeof barrierRegistryAll !== 'undefined') barrierRegistryAll.clear();
+            if (typeof barrierIdCounterAll !== 'undefined') barrierIdCounterAll = 0;
+
+            document.getElementById('riskEvent').value = state.riskEvent || '';
+            const probMap = { improbable: 1, posible: 2, probable: 3, altamente: 4 };
+            const sevMap  = { menor: 1, moderado: 2, alto: 3, catastrofico: 4 };
+            (state.causes || []).forEach(c => {
+                const div = addCauseInput();
+                if (!div) return;
+                const ni = div.querySelector('.cause-name-input');
+                if (ni) ni.value = c.name || '';
+                const sl = div.querySelector('.cause-probability-slider');
+                if (sl) { sl.value = probMap[c.prob] || 2; updateCauseProbabilitySlider(sl); }
+                (c.barriers || []).forEach(b => {
+                    const inp = addPreventiveBarrierInput(div.id);
+                    if (!inp) return;
+                    inp.value = b.text || '';
+                    inp.style.background = b.eff === 'high' ? 'rgba(22,163,74,0.08)' : b.eff === 'low' ? 'rgba(220,38,38,0.08)' : 'rgba(245,158,11,0.08)';
+                    const effSel = inp.closest('.barrier-input-item') && inp.closest('.barrier-input-item').querySelector('.barrier-effectiveness');
+                    if (effSel) effSel.value = b.eff || 'medium';
+                    if (b.barrierId) { inp.dataset.barrierId = b.barrierId; if (!barrierRegistryAll.has(b.barrierId)) barrierRegistryAll.set(b.barrierId, { id: b.barrierId, text: b.text || '', eff: b.eff || 'medium' }); }
+                });
+            });
+            (state.impacts || []).forEach(imp => {
+                const div = addImpactInput();
+                if (!div) return;
+                const ni = div.querySelector('.impact-name-input');
+                if (ni) ni.value = imp.name || '';
+                const sl = div.querySelector('.cause-probability-slider');
+                if (sl) { sl.value = sevMap[imp.sev] || 2; updateImpactSeveritySlider(sl); }
+                (imp.barriers || []).forEach(b => {
+                    const inp = addMitigativeBarrierInput(div.id);
+                    if (!inp) return;
+                    inp.value = b.text || '';
+                    inp.style.background = b.eff === 'high' ? 'rgba(22,163,74,0.08)' : b.eff === 'low' ? 'rgba(220,38,38,0.08)' : 'rgba(245,158,11,0.08)';
+                    const effSel = inp.closest('.barrier-input-item') && inp.closest('.barrier-input-item').querySelector('.barrier-effectiveness');
+                    if (effSel) effSel.value = b.eff || 'medium';
+                    if (b.barrierId) { inp.dataset.barrierId = b.barrierId; if (!barrierRegistryAll.has(b.barrierId)) barrierRegistryAll.set(b.barrierId, { id: b.barrierId, text: b.text || '', eff: b.eff || 'medium' }); }
+                });
+            });
+            renderBowTieDiagram(false);
+        }
+
+        function autoSaveBowtieState() {
+            try {
+                localStorage.setItem('bowtie_autosave', JSON.stringify(serializeBowtieState()));
+                const ind = document.getElementById('autosaveIndicator');
+                if (ind) {
+                    const t = new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+                    ind.textContent = `✓ Guardado automáticamente a las ${t}`;
+                    ind.style.opacity = '1';
+                    clearTimeout(ind._t);
+                    ind._t = setTimeout(() => { ind.style.opacity = '0.4'; }, 2500);
+                }
+            } catch(e) {}
+        }
+
+        // =====================================================================
+        // FASE 1: A1 — Validación de completitud + toast global
+        // =====================================================================
+        function showToastMessage(msg, type) {
+            let toast = document.getElementById('globalToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'globalToast';
+                toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:9999;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 4px 18px rgba(0,0,0,0.15);transition:opacity 0.4s;pointer-events:none;white-space:nowrap;';
+                document.body.appendChild(toast);
+            }
+            const bg  = { info:'#f5f5f5', warning:'#fff7ed', success:'#dcfce7', error:'#fee2e2' };
+            const col = { info:'#333', warning:'#9a3412', success:'#166534', error:'#991b1b' };
+            const brd = { info:'#e5e7eb', warning:'#fdba74', success:'#86efac', error:'#fca5a5' };
+            toast.style.background = bg[type] || bg.info;
+            toast.style.color = col[type] || col.info;
+            toast.style.border = `1px solid ${brd[type] || brd.info}`;
+            toast.textContent = msg;
+            toast.style.opacity = '1';
+            clearTimeout(toast._t);
+            toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 3500);
+        }
+
+        function validateBowtieInputs() {
+            let n = 0;
+            document.querySelectorAll('.validation-error-ring').forEach(el => el.classList.remove('validation-error-ring', 'ring-2', 'ring-red-400'));
+            const mark = el => { el.classList.add('validation-error-ring', 'ring-2', 'ring-red-400'); n++; };
+            const re = document.getElementById('riskEvent');
+            if (re && !re.value.trim()) mark(re);
+            document.querySelectorAll('.cause-name-input, .impact-name-input').forEach(el => { if (!el.value.trim()) mark(el); });
+            document.querySelectorAll('.preventive-barrier-input, .mitigative-barrier-input').forEach(el => { if (!el.value.trim()) mark(el); });
+            if (n > 0) showToastMessage(`${n} campo${n > 1 ? 's' : ''} incompleto${n > 1 ? 's' : ''} detectado${n > 1 ? 's' : ''}`, 'warning');
+            return n === 0;
+        }
+
+        // =====================================================================
+        // FASE 1: A3 — Indicador de cobertura mínima inline
+        // =====================================================================
+        function updateBarriersWarnings() {
+            document.querySelectorAll('.cause-input-group').forEach(group => {
+                const count = group.querySelectorAll('.preventive-barriers-container .barrier-input-item').length;
+                let chip = group.querySelector('.no-barriers-chip');
+                if (count === 0) {
+                    if (!chip) {
+                        chip = document.createElement('div');
+                        chip.className = 'no-barriers-chip text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 border-dashed rounded-md px-2 py-1 mt-2';
+                        chip.textContent = '⚠ Sin barreras preventivas';
+                        const sec = group.querySelector('.mt-3');
+                        if (sec) sec.insertAdjacentElement('beforebegin', chip); else group.appendChild(chip);
+                    }
+                    chip.style.display = '';
+                } else {
+                    if (chip) chip.style.display = 'none';
+                }
+            });
+            document.querySelectorAll('.impact-input-group').forEach(group => {
+                const count = group.querySelectorAll('.mitigative-barriers-container .barrier-input-item').length;
+                let chip = group.querySelector('.no-barriers-chip');
+                if (count === 0) {
+                    if (!chip) {
+                        chip = document.createElement('div');
+                        chip.className = 'no-barriers-chip text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 border-dashed rounded-md px-2 py-1 mt-2';
+                        chip.textContent = '⚠ Sin barreras mitigantes';
+                        const sec = group.querySelector('.mt-3');
+                        if (sec) sec.insertAdjacentElement('beforebegin', chip); else group.appendChild(chip);
+                    }
+                    chip.style.display = '';
+                } else {
+                    if (chip) chip.style.display = 'none';
+                }
+            });
+        }
+
+        // =====================================================================
+        // FASE 1: D14 — Atajos de teclado
+        // =====================================================================
+        document.addEventListener('keydown', function(e) {
+            const tag = document.activeElement && document.activeElement.tagName;
+            const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+            if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+                e.preventDefault(); if (activeTab === 'bowtie') addCauseInput();
+            } else if (e.ctrlKey && e.shiftKey && e.key === 'I') {
+                e.preventDefault(); if (activeTab === 'bowtie') addImpactInput();
+            } else if (e.ctrlKey && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                if (activeTab === 'bowtie') {
+                    const f = document.activeElement;
+                    const cg = f && f.closest('.cause-input-group');
+                    const ig = f && f.closest('.impact-input-group');
+                    if (cg) addPreventiveBarrierInput(cg.id);
+                    else if (ig) addMitigativeBarrierInput(ig.id);
+                    else showToastMessage('Haz clic en una causa o consecuencia primero', 'info');
+                }
+            } else if (e.ctrlKey && e.key === 's') {
+                e.preventDefault(); exportCurrentAnalysis();
+            } else if (!isTyping && e.key === '?') {
+                toggleKeyboardShortcutsOverlay();
+            } else if (e.key === 'Escape') {
+                const ov = document.getElementById('keyboardShortcutsOverlay');
+                if (ov && ov.style.display !== 'none') ov.style.display = 'none';
+            }
+        });
+
+        function toggleKeyboardShortcutsOverlay() {
+            let ov = document.getElementById('keyboardShortcutsOverlay');
+            if (!ov) {
+                ov = document.createElement('div');
+                ov.id = 'keyboardShortcutsOverlay';
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:10000;display:flex;align-items:center;justify-content:center;';
+                ov.innerHTML = `<div style="background:#fff;border-radius:12px;padding:28px 36px;max-width:420px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,0.2);">
+                  <h3 style="font-size:16px;font-weight:700;color:#333;margin-bottom:16px;border-bottom:3px solid #FFF159;padding-bottom:8px;">⌨ Atajos de Teclado</h3>
+                  <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                    <tr><td style="padding:7px 0;color:#666;font-family:monospace;font-size:12px;">Ctrl + Shift + C</td><td style="padding:7px 0;font-weight:600;color:#333;">Nueva Causa</td></tr>
+                    <tr style="background:#fafafa;"><td style="padding:7px 4px;color:#666;font-family:monospace;font-size:12px;">Ctrl + Shift + I</td><td style="padding:7px 4px;font-weight:600;color:#333;">Nueva Consecuencia</td></tr>
+                    <tr><td style="padding:7px 0;color:#666;font-family:monospace;font-size:12px;">Ctrl + Shift + B</td><td style="padding:7px 0;font-weight:600;color:#333;">Nueva Barrera (en grupo activo)</td></tr>
+                    <tr style="background:#fafafa;"><td style="padding:7px 4px;color:#666;font-family:monospace;font-size:12px;">Ctrl + S</td><td style="padding:7px 4px;font-weight:600;color:#333;">Exportar XLSX</td></tr>
+                    <tr><td style="padding:7px 0;color:#666;font-family:monospace;font-size:12px;">?</td><td style="padding:7px 0;font-weight:600;color:#333;">Mostrar/ocultar este panel</td></tr>
+                    <tr style="background:#fafafa;"><td style="padding:7px 4px;color:#666;font-family:monospace;font-size:12px;">Esc</td><td style="padding:7px 4px;font-weight:600;color:#333;">Cerrar panel</td></tr>
+                  </table>
+                  <button onclick="document.getElementById('keyboardShortcutsOverlay').style.display='none'" style="margin-top:18px;width:100%;padding:9px;background:#FFF159;border:1px solid #f0d800;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;">Cerrar</button>
+                </div>`;
+                ov.addEventListener('click', e => { if (e.target === ov) ov.style.display = 'none'; });
+                document.body.appendChild(ov);
+            } else {
+                ov.style.display = ov.style.display === 'none' ? 'flex' : 'none';
+            }
+        }
+
+        // =====================================================================
+        // Restaurar estado guardado al cargar la página
+        // =====================================================================
+        (function() {
+            try {
+                const saved = localStorage.getItem('bowtie_autosave');
+                if (saved) {
+                    const state = JSON.parse(saved);
+                    if (state && (state.riskEvent || (state.causes && state.causes.length) || (state.impacts && state.impacts.length))) {
+                        deserializeBowtieState(state);
+                        const ind = document.getElementById('autosaveIndicator');
+                        if (ind) { ind.textContent = '✓ Análisis restaurado automáticamente'; ind.style.opacity = '1'; setTimeout(() => { ind.style.opacity = '0.4'; }, 3500); }
+                    }
+                }
+            } catch(e) {}
+        })();
+
     </script>
 </body>
 </html>
