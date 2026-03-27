@@ -1801,11 +1801,11 @@
                 g.appendChild(nt);
                 const sl = txt(label, { x: rightNodeX + 10, y: ncy + nodeH / 2 - 9, 'font-size': 9, fill: color, style: 'pointer-events:none' });
                 g.appendChild(sl);
-                // Badge: conteo de barreras (esquina superior izquierda del nodo consecuencia)
+                // Badge: conteo de barreras (esquina superior derecha del nodo consecuencia)
                 const bCount = impact.barriers.length;
                 const badgeColor = impact.barriers.some(b => b.eff === 'high') ? '#16a34a' : impact.barriers.some(b => b.eff === 'medium') ? '#f59e0b' : bCount > 0 ? '#dc2626' : '#9ca3af';
-                g.appendChild(el('circle', { cx: rightNodeX + 11, cy: ncy - nodeH / 2 + 11, r: 9, fill: badgeColor, style: 'pointer-events:none' }));
-                const bt = el('text', { x: rightNodeX + 11, y: ncy - nodeH / 2 + 15, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 700, fill: '#fff', style: 'pointer-events:none' });
+                g.appendChild(el('circle', { cx: rightNodeX + nodeW - 11, cy: ncy - nodeH / 2 + 11, r: 9, fill: badgeColor, style: 'pointer-events:none' }));
+                const bt = el('text', { x: rightNodeX + nodeW - 11, y: ncy - nodeH / 2 + 15, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 700, fill: '#fff', style: 'pointer-events:none' });
                 bt.textContent = String(bCount); g.appendChild(bt);
                 svg.appendChild(g);
             });
@@ -1999,58 +1999,6 @@
                 ? 'background:#dcfce7;border:1px solid #86efac;color:#166534;'
                 : 'background:#f5f5f5;border:1px solid #e5e7eb;color:#555;';
 
-            // B4: Construir matriz 4x4
-            const probKeys = ['improbable','posible','probable','altamente'];
-            const sevKeys  = ['menor','moderado','alto','catastrofico'];
-            const probRowLabels = ['Altamente Probable','Probable','Posible','Improbable'];
-            const sevColLabels  = ['Menor','Moderado','Alto','Catastrófico'];
-            // Contar pathways por celda (prob × sev)
-            const matrixCounts = {};
-            causes.forEach(c => {
-                const p = probScores[c.prob] || 2;
-                impacts.forEach(i => {
-                    const s = sevScores[i.severity] || 2;
-                    const key = `${p}_${s}`;
-                    // Si modo residual, usar scores residuales para asignar la celda correcta
-                    if (residualModeActive) {
-                        const resScore = p * p * calcResidualFactor(c.barriers) + s * s * calcResidualFactor(i.barriers);
-                        // Para la matriz en modo residual, mantenemos las mismas celdas p×s
-                        // pero mostramos el score residual del pathway
-                        matrixCounts[key] = (matrixCounts[key] || { count: 0, resTotal: 0 });
-                        matrixCounts[key].count++;
-                        matrixCounts[key].resTotal += (p * p * calcResidualFactor(c.barriers));
-                    } else {
-                        matrixCounts[key] = (matrixCounts[key] || { count: 0, resTotal: 0 });
-                        matrixCounts[key].count++;
-                    }
-                });
-            });
-
-            function matrixCellBg(p, s) {
-                const score = p * s;
-                if (score >= 12) return '#fca5a5';
-                if (score >= 8)  return '#fdba74';
-                if (score >= 4)  return '#fde68a';
-                return '#bbf7d0';
-            }
-
-            let matrixRowsHTML = '';
-            for (let pi = 3; pi >= 0; pi--) {
-                const p = pi + 1;
-                const pKey = probKeys[pi];
-                let rowHTML = `<td style="font-size:10px;color:#555;padding:3px 5px;white-space:nowrap;font-weight:600;min-width:80px;">${probRowLabels[3 - pi]}</td>`;
-                for (let si = 0; si < 4; si++) {
-                    const s = si + 1;
-                    const key = `${p}_${s}`;
-                    const cell = matrixCounts[key] || { count: 0 };
-                    const bg = matrixCellBg(p, s);
-                    const hasPathways = cell.count > 0;
-                    rowHTML += `<td style="width:44px;height:38px;text-align:center;background:${bg};border:1px solid rgba(0,0,0,0.07);font-size:${hasPathways ? 14 : 11}px;font-weight:${hasPathways ? 700 : 400};color:${hasPathways ? '#1a1a1a' : '#ccc'};cursor:${hasPathways ? 'default' : 'default'};">${hasPathways ? cell.count : ''}</td>`;
-                }
-                matrixRowsHTML += `<tr>${rowHTML}</tr>`;
-            }
-            const matrixHeaderHTML = `<tr><td></td>${sevColLabels.map(l => `<td style="font-size:10px;color:#555;padding:3px 5px;text-align:center;font-weight:600;">${l}</td>`).join('')}</tr>`;
-
             // F19: Criticality table
             const rankings = calcBarrierCriticality(causes, impacts);
             let criticalityRowsHTML = '';
@@ -2073,8 +2021,6 @@
             }
 
             // Estado colapsado persistente (mantenido en el panel mismo)
-            const prevMatrix = panel.querySelector('.fase2-matrix-body');
-            const matrixOpen = prevMatrix ? prevMatrix.style.display !== 'none' : false;
             const prevCrit = panel.querySelector('.fase2-criticality-body');
             const critOpen = prevCrit ? prevCrit.style.display !== 'none' : false;
 
@@ -2094,25 +2040,6 @@
                 </div>
                 <div class="risk-summary-body">
                     ${alertsHTML}
-                </div>
-                <div style="border-top:1px solid #f0f0f0;margin-top:0;">
-                    <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';" style="display:flex;align-items:center;gap:6px;padding:8px 14px;cursor:pointer;user-select:none;background:#fafafa;border-bottom:1px solid #f0f0f0;">
-                        <span style="font-size:12px;font-weight:700;color:#444;">Matriz de Riesgo 4×4</span>
-                        <span style="font-size:10px;color:#999;margin-left:4px;">${residualModeActive ? '— modo residual' : '— riesgo inherente'}</span>
-                        <span style="margin-left:auto;font-size:11px;color:#aaa;">▼</span>
-                    </div>
-                    <div class="fase2-matrix-body" style="display:${matrixOpen ? 'block' : 'none'};padding:12px 14px;overflow-x:auto;">
-                        <table style="border-collapse:collapse;font-size:12px;">
-                            <thead>${matrixHeaderHTML}</thead>
-                            <tbody>${matrixRowsHTML}</tbody>
-                        </table>
-                        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
-                            <span style="font-size:10px;color:#555;display:flex;align-items:center;gap:3px;"><span style="width:12px;height:12px;background:#bbf7d0;border-radius:2px;display:inline-block;"></span>Bajo (1-3)</span>
-                            <span style="font-size:10px;color:#555;display:flex;align-items:center;gap:3px;"><span style="width:12px;height:12px;background:#fde68a;border-radius:2px;display:inline-block;"></span>Medio (4-7)</span>
-                            <span style="font-size:10px;color:#555;display:flex;align-items:center;gap:3px;"><span style="width:12px;height:12px;background:#fdba74;border-radius:2px;display:inline-block;"></span>Alto (8-11)</span>
-                            <span style="font-size:10px;color:#555;display:flex;align-items:center;gap:3px;"><span style="width:12px;height:12px;background:#fca5a5;border-radius:2px;display:inline-block;"></span>Crítico (12+)</span>
-                        </div>
-                    </div>
                 </div>
                 <div style="border-top:1px solid #f0f0f0;">
                     <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';" style="display:flex;align-items:center;gap:6px;padding:8px 14px;cursor:pointer;user-select:none;background:#fafafa;border-bottom:1px solid #f0f0f0;">
