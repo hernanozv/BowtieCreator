@@ -1351,21 +1351,7 @@
                 return;
             }
 
-            // --- Dimensiones ---
-            const containerW = container.clientWidth || 960;
-            const W = Math.max(960, containerW);
-            const numRows = Math.max(causes.length, impacts.length, 1);
-            const maxB = Math.max(
-                causes.reduce((m, c) => Math.max(m, c.barriers.length), 0),
-                impacts.reduce((m, i) => Math.max(m, i.barriers.length), 0)
-            );
-            const rowH = Math.max(100, 70 + maxB * 18);
-            const H = Math.max(420, numRows * rowH + 100);
-            const cx = W / 2, cy = H / 2;
-            const R = 62;
-            const nodeW = 162;
-            const leftNodeX = 16, rightNodeX = W - nodeW - 16;
-
+            // --- Helpers de texto ---
             function wrapSvgText(text, maxCPL, maxL) {
                 const words = text.split(' ');
                 const lines = [];
@@ -1378,6 +1364,26 @@
                 if (cur) lines.push(cur);
                 return lines.slice(0, maxL);
             }
+            function calcNodeH(name) {
+                // top-pad(14) + lines×15 + badge-area(16)
+                return 14 + wrapSvgText(name, 20, 3).length * 15 + 16;
+            }
+
+            // --- Dimensiones ---
+            const containerW = container.clientWidth || 960;
+            const W = Math.max(960, containerW);
+            const numRows = Math.max(causes.length, impacts.length, 1);
+            const maxB = Math.max(
+                causes.reduce((m, c) => Math.max(m, c.barriers.length), 0),
+                impacts.reduce((m, i) => Math.max(m, i.barriers.length), 0)
+            );
+            const maxNodeH = Math.max(...causes.map(c => calcNodeH(c.name)), ...impacts.map(i => calcNodeH(i.name)), 44);
+            const rowH = Math.max(maxNodeH + 30, 60 + maxB * 22);
+            const H = Math.max(420, numRows * rowH + 100);
+            const cx = W / 2, cy = H / 2;
+            const R = 62;
+            const nodeW = 190;
+            const leftNodeX = 16, rightNodeX = W - nodeW - 16;
 
             function getNodeCY(i, total) {
                 if (total <= 1) return cy;
@@ -1507,12 +1513,13 @@
                         transform: `translate(${bx},${by}) rotate(${pathAngle})` }));
 
                     // Label flotante: causa → arriba (perpendicular "above"), consecuencia → abajo
-                    // "Above" perp dir: (uy, -ux); "Below": (-uy, ux)
                     const sign = barrierSide === 'preventive' ? 1 : -1;
-                    const dist = 46;
+                    const bLines = wrapSvgText(barrier.text, 14, 3);
+                    const lW = 110;
+                    const lH = 12 + bLines.length * 14;
+                    const dist = 50 + lH / 2;
                     const lx = bx + sign * uy * dist;
                     const ly = by - sign * ux * dist;
-                    const lW = 84, lH = 26;
 
                     // Connector
                     bg.appendChild(el('line', {
@@ -1521,16 +1528,13 @@
                         stroke: effColor, 'stroke-width': 1, 'stroke-dasharray': '3,2', 'stroke-opacity': 0.55
                     }));
 
-                    // Shadow
+                    // Shadow + Box
                     bg.appendChild(el('rect', { x: lx - lW / 2 + 1, y: ly - lH / 2 + 1, width: lW, height: lH, rx: 4, fill: 'rgba(0,0,0,0.07)' }));
-                    // Box (borde colorido ya indica la efectividad — sin dot redundante)
                     bg.appendChild(el('rect', { x: lx - lW / 2, y: ly - lH / 2, width: lW, height: lH, rx: 4, fill: '#ffffff', stroke: effColor, 'stroke-width': 1.5 }));
-                    // Text centrado
-                    const te = txt(trunc(barrier.text, 11), {
-                        x: lx, y: ly + 4,
-                        'font-size': 10, fill: '#1a1a1a', 'text-anchor': 'middle',
-                        style: 'pointer-events:none'
-                    });
+                    // Texto multi-línea centrado
+                    const bTextY0 = ly - (bLines.length - 1) * 7 + 4;
+                    const te = el('text', { x: lx, y: bTextY0, 'font-size': 10, fill: '#1a1a1a', 'text-anchor': 'middle', style: 'pointer-events:none' });
+                    bLines.forEach((line, li) => { const sp = el('tspan', { x: lx, dy: li === 0 ? 0 : 14 }); sp.textContent = line; te.appendChild(sp); });
                     bg.appendChild(te);
 
                     // SVG title tooltip (full text)
@@ -1608,18 +1612,18 @@
                 const color = probColors[cause.prob] || '#faad14';
                 const bg = probBg[cause.prob] || '#fffbe6';
                 const label = probLabels[cause.prob] || cause.prob;
-                const nameLines = wrapSvgText(cause.name, 22, 2);
-                const nodeH = nameLines.length > 1 ? 58 : 44;
+                const nameLines = wrapSvgText(cause.name, 20, 3);
+                const nodeH = calcNodeH(cause.name);
                 const g = el('g', { style: 'cursor:pointer' });
                 g.addEventListener('click', () => focusBowtieGroup(cause.refId));
                 g.appendChild(el('rect', { x: leftNodeX + 1, y: ncy - nodeH / 2 + 1, width: nodeW, height: nodeH, rx: 6, fill: 'rgba(0,0,0,0.07)' }));
                 g.appendChild(el('rect', { x: leftNodeX, y: ncy - nodeH / 2, width: nodeW, height: nodeH, rx: 6, fill: bg, stroke: color, 'stroke-width': 1.5 }));
                 g.appendChild(el('rect', { x: leftNodeX, y: ncy - nodeH / 2, width: 6, height: nodeH, rx: 3, fill: color }));
-                const textY0 = nameLines.length > 1 ? ncy - nodeH / 2 + 13 : ncy - nodeH / 2 + 16;
+                const textY0 = ncy - nodeH / 2 + 14;
                 const nt = el('text', { x: leftNodeX + 14, y: textY0, 'font-size': 11, 'font-weight': 600, fill: '#1a1a1a', style: 'pointer-events:none' });
-                nameLines.forEach((line, li) => { const sp = el('tspan', { x: leftNodeX + 14, dy: li === 0 ? 0 : 13 }); sp.textContent = line; nt.appendChild(sp); });
+                nameLines.forEach((line, li) => { const sp = el('tspan', { x: leftNodeX + 14, dy: li === 0 ? 0 : 15 }); sp.textContent = line; nt.appendChild(sp); });
                 g.appendChild(nt);
-                const pl = txt(label, { x: leftNodeX + 14, y: ncy + nodeH / 2 - 8, 'font-size': 9, fill: color, style: 'pointer-events:none' });
+                const pl = txt(label, { x: leftNodeX + 14, y: ncy + nodeH / 2 - 9, 'font-size': 9, fill: color, style: 'pointer-events:none' });
                 g.appendChild(pl);
                 svg.appendChild(g);
             });
@@ -1630,18 +1634,18 @@
                 const color = sevColors[impact.severity] || '#faad14';
                 const bg = sevBg[impact.severity] || '#fffbe6';
                 const label = sevLabels[impact.severity] || impact.severity;
-                const nameLines = wrapSvgText(impact.name, 22, 2);
-                const nodeH = nameLines.length > 1 ? 58 : 44;
+                const nameLines = wrapSvgText(impact.name, 20, 3);
+                const nodeH = calcNodeH(impact.name);
                 const g = el('g', { style: 'cursor:pointer' });
                 g.addEventListener('click', () => focusBowtieGroup(impact.refId));
                 g.appendChild(el('rect', { x: rightNodeX + 1, y: ncy - nodeH / 2 + 1, width: nodeW, height: nodeH, rx: 6, fill: 'rgba(0,0,0,0.07)' }));
                 g.appendChild(el('rect', { x: rightNodeX, y: ncy - nodeH / 2, width: nodeW, height: nodeH, rx: 6, fill: bg, stroke: color, 'stroke-width': 1.5 }));
                 g.appendChild(el('rect', { x: rightNodeX + nodeW - 6, y: ncy - nodeH / 2, width: 6, height: nodeH, rx: 3, fill: color }));
-                const textY0 = nameLines.length > 1 ? ncy - nodeH / 2 + 13 : ncy - nodeH / 2 + 16;
+                const textY0 = ncy - nodeH / 2 + 14;
                 const nt = el('text', { x: rightNodeX + 10, y: textY0, 'font-size': 11, 'font-weight': 600, fill: '#1a1a1a', style: 'pointer-events:none' });
-                nameLines.forEach((line, li) => { const sp = el('tspan', { x: rightNodeX + 10, dy: li === 0 ? 0 : 13 }); sp.textContent = line; nt.appendChild(sp); });
+                nameLines.forEach((line, li) => { const sp = el('tspan', { x: rightNodeX + 10, dy: li === 0 ? 0 : 15 }); sp.textContent = line; nt.appendChild(sp); });
                 g.appendChild(nt);
-                const sl = txt(label, { x: rightNodeX + 10, y: ncy + nodeH / 2 - 8, 'font-size': 9, fill: color, style: 'pointer-events:none' });
+                const sl = txt(label, { x: rightNodeX + 10, y: ncy + nodeH / 2 - 9, 'font-size': 9, fill: color, style: 'pointer-events:none' });
                 g.appendChild(sl);
                 svg.appendChild(g);
             });
