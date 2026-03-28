@@ -1521,12 +1521,13 @@
 
             function riskStroke(score, isResidual) {
                 if (isResidual) {
-                    // Umbrales para scores residuales LOPA (escala mucho menor que inherente)
-                    // score inherente máx=16; con PFDs: 16×0.5=8, 16×0.1=1.6, 16×0.01=0.16
-                    if (score >= 4.0) return { color: '#f5222d', width: 3 };   // riesgo residual crítico
-                    if (score >= 1.0) return { color: '#ff7a00', width: 2.5 }; // riesgo residual medio
-                    if (score >= 0.2) return { color: '#f0b800', width: 2 };   // riesgo residual bajo
-                    return { color: '#52c41a', width: 2 };                      // riesgo residual negligible
+                    // Umbrales residuales alineados con la escala inherente (1-16)
+                    // Sin barreras: residual = inherente → mismo color que modo inherente
+                    // Con barreras: valores reducidos; verde cuando residual ≤ 1 (mínimo inherente)
+                    if (score >= 9)  return { color: '#f5222d', width: 3 };   // riesgo residual alto
+                    if (score >= 4)  return { color: '#ff7a00', width: 2.5 }; // riesgo residual medio-alto
+                    if (score > 1)   return { color: '#f0b800', width: 2 };   // riesgo residual parcialmente mitigado
+                    return { color: '#52c41a', width: 2 };                     // riesgo residual controlado (≤1)
                 }
                 // Modo inherente
                 if (score >= 9) return { color: '#f5222d', width: 3 };
