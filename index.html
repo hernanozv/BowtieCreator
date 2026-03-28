@@ -1517,7 +1517,16 @@
             const probScores  = { improbable: 1, posible: 2, probable: 3, altamente: 4 };
             const sevScores   = { menor: 1, moderado: 2, alto: 3, catastrofico: 4 };
 
-            function riskStroke(score) {
+            function riskStroke(score, isResidual) {
+                if (isResidual) {
+                    // Umbrales para scores residuales LOPA (escala mucho menor que inherente)
+                    // score inherente máx=16; con PFDs: 16×0.5=8, 16×0.1=1.6, 16×0.01=0.16
+                    if (score >= 4.0) return { color: '#f5222d', width: 3 };   // riesgo residual crítico
+                    if (score >= 1.0) return { color: '#ff7a00', width: 2.5 }; // riesgo residual medio
+                    if (score >= 0.2) return { color: '#f0b800', width: 2 };   // riesgo residual bajo
+                    return { color: '#52c41a', width: 2 };                      // riesgo residual negligible
+                }
+                // Modo inherente
                 if (score >= 9) return { color: '#f5222d', width: 3 };
                 if (score >= 4) return { color: '#ff7a00', width: 2.5 };
                 return { color: '#52c41a', width: 2 };
@@ -1706,7 +1715,7 @@
                 const pScore = probScores[cause.prob] || 2;
                 const inherentScore = pScore * pScore;
                 const displayScore = residualModeActive ? inherentScore * calcResidualFactor(cause.barriers) : inherentScore;
-                const ls = riskStroke(displayScore);
+                const ls = riskStroke(displayScore, residualModeActive);
                 const g = buildPathGroup(leftNodeX + nodeW, causeCY, cx - R, cy, cause.barriers, cause.refId, 'preventive', ls);
                 pathGroups.push(g);
                 svg.appendChild(g);
@@ -1718,7 +1727,7 @@
                 const sScore = sevScores[impact.severity] || 2;
                 const inherentScore = sScore * sScore;
                 const displayScore = residualModeActive ? inherentScore * calcResidualFactor(impact.barriers) : inherentScore;
-                const ls = riskStroke(displayScore);
+                const ls = riskStroke(displayScore, residualModeActive);
                 const g = buildPathGroup(cx + R, cy, rightNodeX, impactCY, impact.barriers, impact.refId, 'mitigative', ls);
                 pathGroups.push(g);
                 svg.appendChild(g);
@@ -1839,12 +1848,21 @@
         }
 
         // =====================================================================
-        // FASE 2: B5 — Factor de riesgo residual por barreras
+        // FASE 2: B5 — Factor de riesgo residual (metodología LOPA)
         // =====================================================================
+        // Cada barrera actúa como una Capa Independiente de Protección (IPL).
+        // El PFD (Probability of Failure on Demand) determina cuánto riesgo
+        // pasa a través de la barrera cuando es demandada:
+        //   Alta   ≈ SIL 2 → PFD = 0.01  (falla 1 de cada 100 demandas, RRF = 100)
+        //   Media  ≈ SIL 1 → PFD = 0.10  (falla 1 de cada 10 demandas,  RRF =  10)
+        //   Baja   ≈ básica → PFD = 0.50  (falla 1 de cada 2 demandas,   RRF =   2)
+        // Factor residual = Π(PFD_i): fracción de riesgo inherente que queda.
+        // Una sola barrera baja deja el 50% del riesgo; se necesitan múltiples
+        // capas para alcanzar una reducción significativa.
+        const LOPA_PFD = { high: 0.01, medium: 0.10, low: 0.50 };
         function calcResidualFactor(barriers) {
             if (!barriers || barriers.length === 0) return 1;
-            const effMap = { high: 0.8, medium: 0.5, low: 0.2 };
-            return barriers.reduce((r, b) => r * (1 - (effMap[b.eff] || 0.2)), 1);
+            return barriers.reduce((r, b) => r * (LOPA_PFD[b.eff] || 0.50), 1);
         }
 
         // =====================================================================
@@ -1928,9 +1946,10 @@
 
             // B6: BPEI
             const bpei = calcBPEI(causes, impacts);
-            const bpeiColor = bpei >= 70 ? '#16a34a' : bpei >= 40 ? '#b45309' : '#dc2626';
-            const bpeiBg    = bpei >= 70 ? '#dcfce7' : bpei >= 40 ? '#fef9c3' : '#fee2e2';
-            const bpeiBorder= bpei >= 70 ? '#86efac' : bpei >= 40 ? '#fde68a' : '#fca5a5';
+            // Umbrales LOPA: con PFDs reales un buen portafolio supera el 90%
+            const bpeiColor = bpei >= 90 ? '#16a34a' : bpei >= 70 ? '#b45309' : '#dc2626';
+            const bpeiBg    = bpei >= 90 ? '#dcfce7' : bpei >= 70 ? '#fef9c3' : '#fee2e2';
+            const bpeiBorder= bpei >= 90 ? '#86efac' : bpei >= 70 ? '#fde68a' : '#fca5a5';
 
             // Alertas
             const alerts = [];
@@ -1979,23 +1998,28 @@
                 dupes.forEach(t => alerts.push({ level: 'warning', html: `Barrera duplicada detectada: <strong>"${t}"</strong> aparece en más de un nodo.` }));
             }
 
-            // F20: Rendimiento decreciente de barreras (redundancia)
+            // F20: Redundancia LOPA — rendimiento decreciente de capas de protección
+            // En LOPA cada IPL multiplica el riesgo residual por su PFD. Se ordena de más
+            // a menos efectiva (PFD ascendente) y se mide cuánto aporta la última capa
+            // en relación al riesgo residual total sin ella (contribución marginal absoluta).
             [...causes, ...impacts].forEach(node => {
                 if (node.barriers.length < 2) return;
-                const effMap = { high: 0.8, medium: 0.5, low: 0.2 };
-                // Calcular contribución marginal de la última barrera
-                const sorted = [...node.barriers].sort((a, b) => (effMap[b.eff] || 0.2) - (effMap[a.eff] || 0.2));
-                let remaining = 1;
-                const marginals = sorted.map(b => {
-                    const reduction = remaining * (effMap[b.eff] || 0.2);
-                    remaining *= (1 - (effMap[b.eff] || 0.2));
-                    return reduction;
-                });
-                const lastMarginal = marginals[marginals.length - 1];
-                const totalReduction = 1 - remaining;
-                if (totalReduction > 0 && lastMarginal / totalReduction < 0.05) {
+                // Ordenar por PFD ascendente (más efectiva primero)
+                const sorted = [...node.barriers].sort((a, b) => (LOPA_PFD[a.eff] || 0.5) - (LOPA_PFD[b.eff] || 0.5));
+                const totalResF = calcResidualFactor(sorted);         // factor con todas
+                const withoutLast = sorted.slice(0, -1);
+                const resWithout  = calcResidualFactor(withoutLast);   // factor sin la última
+                // Contribución marginal relativa: cuánto reduce la última capa respecto al residual sin ella
+                // marginal = (resWithout - totalResF) / resWithout = 1 - PFD_last
+                const lastPfd = LOPA_PFD[sorted[sorted.length - 1].eff] || 0.5;
+                const marginalContrib = 1 - lastPfd; // fracción de riesgo que la última capa elimina
+                // Si la capa tiene PFD=0.5 (baja) aplicada después de una alta, su contribución
+                // marginal en términos absolutos sobre el riesgo residual es muy pequeña
+                const absoluteContrib = resWithout - totalResF; // reducción absoluta del factor
+                if (resWithout < 0.5 && absoluteContrib < 0.01) {
+                    // El riesgo ya es bajo (<50% inherente) y la última barrera aporta muy poco en abs.
                     const nodeName = node.name || '(nodo)';
-                    alerts.push({ level: 'info', html: `Rendimiento decreciente en <strong>"${nodeName}"</strong>: la barrera de menor efectividad aporta menos del 5% de la reducción total (posible redundancia).` });
+                    alerts.push({ level: 'info', html: `Rendimiento decreciente (LOPA) en <strong>"${nodeName}"</strong>: las barreras previas ya reducen el riesgo a un factor de ${(resWithout).toFixed(3)} — la capa adicional aporta un beneficio marginal muy bajo (Δfactor = ${absoluteContrib.toFixed(4)}).` });
                 }
             });
 
@@ -2959,24 +2983,30 @@
             const riskLabel = score >= 9 ? 'Alto' : score >= 4 ? 'Medio' : 'Bajo';
             const riskColor = score >= 9 ? '#dc2626' : score >= 4 ? '#b45309' : '#16a34a';
             const resF = calcResidualFactor(node.barriers);
-            const residual = (score * resF).toFixed(2);
+            const residualRaw = score * resF;
+            // Con PFDs LOPA el residual puede ser muy pequeño; ajustar decimales
+            const residual = residualRaw < 0.1 ? residualRaw.toFixed(4) : residualRaw.toFixed(2);
             const reduction = Math.round((1 - resF) * 100);
 
-            const effMap = { high: 0.8, medium: 0.5, low: 0.2 };
             const effLabels = { high: 'Alta', medium: 'Media', low: 'Baja' };
             const effColors = { high: '#16a34a', medium: '#b45309', low: '#dc2626' };
+            const pfdLabels = { high: 'PFD 0.01 · RRF 100', medium: 'PFD 0.10 · RRF 10', low: 'PFD 0.50 · RRF 2' };
 
             let barriersHTML = node.barriers.length === 0
                 ? '<p style="color:#999;font-size:12px;font-style:italic;">Sin barreras registradas</p>'
                 : node.barriers.map((b, idx) => {
                     const barriersWithout = node.barriers.filter((_, i) => i !== idx);
-                    const marginal = (score * calcResidualFactor(barriersWithout) - score * resF).toFixed(2);
+                    const marginal = (score * calcResidualFactor(barriersWithout) - score * resF).toFixed(3);
                     const ec = effColors[b.eff] || '#555';
                     const el2 = effLabels[b.eff] || b.eff;
-                    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f5f5f5;">
-                        <span style="flex:1;font-size:12px;color:#1a1a1a;">${b.text || '(sin nombre)'}</span>
-                        <span style="font-size:10px;font-weight:700;color:${ec};background:${ec}22;border-radius:4px;padding:2px 6px;">${el2}</span>
-                        <span style="font-size:10px;color:#777;" title="Incremento de riesgo si se elimina esta barrera">Δ ${marginal}</span>
+                    const pfdInfo = pfdLabels[b.eff] || '';
+                    return `<div style="padding:7px 0;border-bottom:1px solid #f5f5f5;">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span style="flex:1;font-size:12px;color:#1a1a1a;">${b.text || '(sin nombre)'}</span>
+                            <span style="font-size:10px;font-weight:700;color:${ec};background:${ec}22;border-radius:4px;padding:2px 6px;">${el2}</span>
+                            <span style="font-size:10px;color:#777;font-weight:600;" title="Incremento de riesgo residual si se elimina esta barrera">ΔRiesgo +${marginal}</span>
+                        </div>
+                        <div style="font-size:9px;color:#aaa;margin-top:2px;">${pfdInfo}</div>
                     </div>`;
                 }).join('');
 
