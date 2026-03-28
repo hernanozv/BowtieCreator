@@ -1172,7 +1172,7 @@
                     <div class="mt-1 flex items-center gap-3">
                         <div class="w-96 md:w-[28rem]">
                             <input type="range" min="1" max="4" step="1" value="2" class="cause-probability-slider" draggable="false" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" onpointercancel="resumeGroupDnD(this)" onmousedown="pauseGroupDnD(this); event.stopPropagation()" onmouseup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)" ondragstart="event.preventDefault();event.stopPropagation();" oninput="updateCauseProbabilitySlider(this)">
-                            <div class="relative mt-1 h-9 text-[11px] text-gray-600 select-none prob-slider-pad">
+                            <div class="relative mt-1 h-12 text-[11px] text-gray-600 select-none prob-slider-pad">
                                 <span class="absolute left-[0%] cause-prob-label" onclick="setCauseProbabilityFromLabel(this, 1)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">
                                     Improbable
                                     <span class="block text-[10px] text-gray-400">(&lt; 8%)</span>
@@ -1287,7 +1287,7 @@
                     <div class="mt-1 flex items-center gap-3">
                         <div class="w-96 md:w-[28rem]">
                             <input type="range" min="1" max="4" step="1" value="2" class="cause-probability-slider" draggable="false" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" onpointercancel="resumeGroupDnD(this)" onmousedown="pauseGroupDnD(this); event.stopPropagation()" onmouseup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)" ondragstart="event.preventDefault();event.stopPropagation();" oninput="updateImpactSeveritySlider(this)">
-                            <div class="relative mt-1 h-9 text-[11px] text-gray-600 select-none prob-slider-pad">
+                            <div class="relative mt-1 h-12 text-[11px] text-gray-600 select-none prob-slider-pad">
                                 <span class="absolute left-[0%] cause-prob-label" onclick="setImpactSeverityFromLabel(this, 1)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">Menor</span>
                                 <span class="absolute left-[33.333%] -translate-x-1/2 transform cause-prob-label w-24 text-center" onclick="setImpactSeverityFromLabel(this, 2)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">Moderado</span>
                                 <span class="absolute left-[66.666%] -translate-x-1/2 transform cause-prob-label w-24 text-center" onclick="setImpactSeverityFromLabel(this, 3)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">Alto</span>
