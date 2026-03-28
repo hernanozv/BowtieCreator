@@ -1965,20 +1965,6 @@
                 alerts.push({ level: 'warning', html: `Consecuencia <strong>"${i.name}"</strong>: todas sus barreras mitigativas son de baja efectividad.` });
             });
 
-            // 7. Path de mayor riesgo (prob × severidad)
-            let maxScore = 0, maxPath = null;
-            causes.forEach(c => {
-                impacts.forEach(i => {
-                    const score = (probScores[c.prob] || 2) * (sevScores[i.severity] || 2);
-                    if (score > maxScore) { maxScore = score; maxPath = { cause: c, impact: i, score }; }
-                });
-            });
-            if (maxPath) {
-                const scoreLabel = maxScore >= 9 ? 'ALTO' : maxScore >= 4 ? 'MEDIO' : 'BAJO';
-                const lvl = maxScore >= 9 ? 'critical' : maxScore >= 4 ? 'warning' : 'info';
-                alerts.push({ level: lvl, html: `Path más crítico: <strong>"${maxPath.cause.name}"</strong> → ${riskEventName} → <strong>"${maxPath.impact.name}"</strong> — Riesgo: <strong>${scoreLabel} (${maxScore}/16)</strong>` });
-            }
-
             // A2: Detección de barreras duplicadas (mismo texto, case-insensitive)
             const allBarrierTexts = [];
             [...causes, ...impacts].forEach(node => {
@@ -2065,34 +2051,67 @@
             }
 
 
-            // F18: What-If — BPEI si todas las barreras bajas fueran subidas a media
-            const whatIfBpei = (() => {
-                const upgradedCauses = causes.map(c => ({ ...c, barriers: c.barriers.map(b => ({ ...b, eff: b.eff === 'low' ? 'medium' : b.eff })) }));
-                const upgradedImpacts = impacts.map(i => ({ ...i, barriers: i.barriers.map(b => ({ ...b, eff: b.eff === 'low' ? 'medium' : b.eff })) }));
-                return calcBPEI(upgradedCauses, upgradedImpacts);
-            })();
-            const whatIfBpeiHigh = (() => {
-                const upgradedCauses = causes.map(c => ({ ...c, barriers: c.barriers.map(b => ({ ...b, eff: 'high' })) }));
-                const upgradedImpacts = impacts.map(i => ({ ...i, barriers: i.barriers.map(b => ({ ...b, eff: 'high' })) }));
-                return calcBPEI(upgradedCauses, upgradedImpacts);
-            })();
-            const lowCount = [...causes, ...impacts].flatMap(n => n.barriers).filter(b => b.eff === 'low').length;
+            // F18: What-If — desglose por preventivas (causas) y mitigantes (consecuencias)
+            function calcSideWhatIf(nodes, getScore, upgradeMode) {
+                let inh = 0, res = 0;
+                nodes.forEach(n => {
+                    const sc = Math.pow(getScore(n) || 2, 2);
+                    inh += sc;
+                    let barriers = n.barriers;
+                    if (upgradeMode === 'low-to-medium') barriers = barriers.map(b => ({ ...b, eff: b.eff === 'low' ? 'medium' : b.eff }));
+                    if (upgradeMode === 'all-high') barriers = barriers.map(b => ({ ...b, eff: 'high' }));
+                    res += sc * calcResidualFactor(barriers);
+                });
+                return inh === 0 ? null : Math.round((1 - res / inh) * 100);
+            }
+            const prevCurr    = calcSideWhatIf(causes,  c => probScores[c.prob],     null);
+            const prevLowMed  = calcSideWhatIf(causes,  c => probScores[c.prob],     'low-to-medium');
+            const prevAllHigh = calcSideWhatIf(causes,  c => probScores[c.prob],     'all-high');
+            const mitCurr     = calcSideWhatIf(impacts, i => sevScores[i.severity],  null);
+            const mitLowMed   = calcSideWhatIf(impacts, i => sevScores[i.severity],  'low-to-medium');
+            const mitAllHigh  = calcSideWhatIf(impacts, i => sevScores[i.severity],  'all-high');
+            const globalLowMed  = calcBPEI(
+                causes.map(c => ({ ...c, barriers: c.barriers.map(b => ({ ...b, eff: b.eff === 'low' ? 'medium' : b.eff })) })),
+                impacts.map(i => ({ ...i, barriers: i.barriers.map(b => ({ ...b, eff: b.eff === 'low' ? 'medium' : b.eff })) }))
+            );
+            const globalAllHigh = calcBPEI(
+                causes.map(c => ({ ...c, barriers: c.barriers.map(b => ({ ...b, eff: 'high' })) })),
+                impacts.map(i => ({ ...i, barriers: i.barriers.map(b => ({ ...b, eff: 'high' })) }))
+            );
+            const lowCountPrev = causes.flatMap(c => c.barriers).filter(b => b.eff === 'low').length;
+            const lowCountMit  = impacts.flatMap(i => i.barriers).filter(b => b.eff === 'low').length;
+            const hasLow = lowCountPrev + lowCountMit > 0;
+
+            function wiMetric(val, baseline, label, numColor, bgColor, showDelta) {
+                if (val === null) return `<div style="background:#f5f5f5;border-radius:5px;padding:7px 9px;"><div style="font-size:9px;color:#bbb;margin-bottom:1px;">${label}</div><div style="font-size:13px;color:#ccc;">—</div></div>`;
+                const delta = val - (baseline || 0);
+                return `<div style="background:${bgColor};border-radius:5px;padding:7px 9px;">
+                    <div style="font-size:9px;color:${numColor};opacity:.75;margin-bottom:1px;">${label}</div>
+                    <div style="font-size:17px;font-weight:800;color:${numColor};line-height:1;">${val}%</div>
+                    ${showDelta ? `<div style="font-size:9px;color:${numColor};opacity:.8;margin-top:1px;">${delta >= 0 ? '+' : ''}${delta} pts</div>` : ''}
+                </div>`;
+            }
+
             const whatIfHTML = `
-                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;">
-                    <div style="flex:1;min-width:120px;background:#f8f8f8;border-radius:6px;padding:8px 10px;">
-                        <div style="font-size:9px;color:#999;margin-bottom:2px;">BPEI Actual</div>
-                        <div style="font-size:18px;font-weight:800;color:${bpeiColor};">${bpei}%</div>
-                    </div>
-                    ${lowCount > 0 ? `<div style="flex:1;min-width:120px;background:#fef9c3;border-radius:6px;padding:8px 10px;">
-                        <div style="font-size:9px;color:#92400e;margin-bottom:2px;">Si bajas → medias (${lowCount})</div>
-                        <div style="font-size:18px;font-weight:800;color:#92400e;">${whatIfBpei}%</div>
-                        <div style="font-size:9px;color:#b45309;">+${whatIfBpei - bpei} pts</div>
-                    </div>` : ''}
-                    <div style="flex:1;min-width:120px;background:#dcfce7;border-radius:6px;padding:8px 10px;">
-                        <div style="font-size:9px;color:#166534;margin-bottom:2px;">Si todas → alta efectividad</div>
-                        <div style="font-size:18px;font-weight:800;color:#166534;">${whatIfBpeiHigh}%</div>
-                        <div style="font-size:9px;color:#16a34a;">+${whatIfBpeiHigh - bpei} pts</div>
-                    </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+                    <div style="font-size:10px;font-weight:700;color:#555;padding:5px 0;text-align:center;border-bottom:2px solid #e5e7eb;">GLOBAL</div>
+                    <div style="font-size:10px;font-weight:700;color:#1d4ed8;padding:5px 0;text-align:center;border-bottom:2px solid #bfdbfe;">PREVENTIVAS</div>
+                    <div style="font-size:10px;font-weight:700;color:#6d28d9;padding:5px 0;text-align:center;border-bottom:2px solid #ddd6fe;">MITIGANTES</div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px;">
+                    ${wiMetric(bpei,         null,       'Actual',              bpeiColor, '#f8f8f8',  false)}
+                    ${wiMetric(prevCurr,     null,       'Actual',              '#1d4ed8', '#eff6ff',  false)}
+                    ${wiMetric(mitCurr,      null,       'Actual',              '#6d28d9', '#f5f3ff',  false)}
+                </div>
+                ${hasLow ? `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px;">
+                    ${wiMetric(globalLowMed, bpei,      `Bajas→medias (${lowCountPrev+lowCountMit})`, '#92400e', '#fef9c3', true)}
+                    ${wiMetric(lowCountPrev > 0 ? prevLowMed : null, prevCurr, `Bajas→medias (${lowCountPrev})`, '#1d4ed8', '#eff6ff', true)}
+                    ${wiMetric(lowCountMit  > 0 ? mitLowMed  : null, mitCurr,  `Bajas→medias (${lowCountMit})`,  '#6d28d9', '#f5f3ff', true)}
+                </div>` : ''}
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px;">
+                    ${wiMetric(globalAllHigh, bpei,     'Si todas → alta',     '#166534', '#dcfce7',  true)}
+                    ${wiMetric(prevAllHigh,   prevCurr, 'Si todas → alta',     '#1d4ed8', '#eff6ff',  true)}
+                    ${wiMetric(mitAllHigh,    mitCurr,  'Si todas → alta',     '#6d28d9', '#f5f3ff',  true)}
                 </div>`;
 
             // Estado colapsado persistente (mantenido en el panel mismo)
