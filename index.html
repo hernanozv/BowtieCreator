@@ -703,6 +703,7 @@
             const effVal = (typeof effOverride === 'string' && effOverride) ? effOverride : (reg && reg.eff);
             if (effSelect && effVal) {
                 try { effSelect.value = effVal; } catch(_) {}
+                if (typeof updateBarrierEffDot === 'function') updateBarrierEffDot(effSelect);
             }
             propagateBarrierText(barrierId, inputEl.value);
         }
@@ -2799,7 +2800,7 @@
                             if (barrierInput) {
                                 barrierInput.value = meta.text;
                                 const effSelect = barrierInput.parentElement?.querySelector('.barrier-effectiveness');
-                                if (effSelect) effSelect.value = meta.eff;
+                                if (effSelect) { effSelect.value = meta.eff; if (typeof updateBarrierEffDot === 'function') updateBarrierEffDot(effSelect); }
                             }
                         });
                     }
@@ -2821,7 +2822,7 @@
                             if (barrierInput) {
                                 barrierInput.value = meta.text;
                                 const effSelect = barrierInput.parentElement?.querySelector('.barrier-effectiveness');
-                                if (effSelect) effSelect.value = meta.eff;
+                                if (effSelect) { effSelect.value = meta.eff; if (typeof updateBarrierEffDot === 'function') updateBarrierEffDot(effSelect); }
                             }
                         });
                     }
