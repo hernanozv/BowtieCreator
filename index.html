@@ -545,8 +545,8 @@
                     <div class="flex items-center justify-between mb-6 border-b pb-2">
                         <h2 class="text-2xl font-semibold section-title">Diagrama Bow-Tie</h2>
                         <div style="display:flex;gap:6px;align-items:center;">
-                            <button type="button" id="heatmapToggleBtn" data-export-ignore="true" onclick="heatmapModeActive=!heatmapModeActive;renderBowTieDiagram(false);this.style.background=heatmapModeActive?'#fef9c3':'';this.style.borderColor=heatmapModeActive?'#f59e0b':'';" class="action-button action-button-secondary" title="Colorear nodos según nivel de riesgo inherente">
-                                ◉ Heatmap
+                            <button type="button" id="residualToggleDiagramBtn" data-export-ignore="true" onclick="residualModeActive=!residualModeActive;renderBowTieDiagram(false);this.textContent=residualModeActive?'Ver Riesgo Inherente':'Ver Riesgo Residual';this.style.background=residualModeActive?'#dcfce7':'';this.style.borderColor=residualModeActive?'#86efac':'';this.style.color=residualModeActive?'#166534':'';" class="action-button action-button-secondary" title="Alternar entre vista de riesgo inherente y residual">
+                                Ver Riesgo Residual
                             </button>
                             <button type="button" data-export-ignore="true" onclick="exportBowtieDiagramImage()" class="action-button action-button-secondary">
                                 Exportar Diagrama
@@ -660,7 +660,6 @@
         };
         let activeTab = 'bowtie';
         let residualModeActive = false; // B5: toggle inherente/residual
-        let heatmapModeActive = false;  // C9: heatmap de riesgo en nodos SVG
         // D12: Undo/Redo
         let undoStack = [], redoStack = [], _undoRestoring = false;
         const UNDO_MAX = 30;
@@ -1788,21 +1787,11 @@
             eventGroup.appendChild(evTxt);
             svg.appendChild(eventGroup);
 
-            // C9: Heatmap — calcula background de nodo según score de riesgo
-            function heatmapNodeBg(score) {
-                // score: 1..16 → de verde claro a rojo
-                if (score >= 12) return '#fecaca'; // rojo
-                if (score >= 8)  return '#fed7aa'; // naranja
-                if (score >= 4)  return '#fef08a'; // amarillo
-                return '#d1fae5';                  // verde
-            }
-
             // --- Nodos de causa ---
             causes.forEach((cause, i) => {
                 const ncy = getNodeCY(i, causes.length);
                 const color = probColors[cause.prob] || '#faad14';
-                const pScore = probScores[cause.prob] || 2;
-                const bg = heatmapModeActive ? heatmapNodeBg(pScore * pScore) : (probBg[cause.prob] || '#fffbe6');
+                const bg = probBg[cause.prob] || '#fffbe6';
                 const label = probLabels[cause.prob] || cause.prob;
                 const nameLines = wrapSvgText(cause.name, 18, 4);
                 const nodeH = calcNodeH(cause.name);
@@ -1832,8 +1821,7 @@
             impacts.forEach((impact, i) => {
                 const ncy = getNodeCY(i, impacts.length);
                 const color = sevColors[impact.severity] || '#faad14';
-                const sScore = sevScores[impact.severity] || 2;
-                const bg = heatmapModeActive ? heatmapNodeBg(sScore * sScore) : (sevBg[impact.severity] || '#fffbe6');
+                const bg = sevBg[impact.severity] || '#fffbe6';
                 const label = sevLabels[impact.severity] || impact.severity;
                 const nameLines = wrapSvgText(impact.name, 18, 4);
                 const nodeH = calcNodeH(impact.name);
@@ -2076,12 +2064,6 @@
                     <span>${a.html}</span>
                 </div>`).join('');
 
-            // B5: Toggle botón inherente/residual
-            const toggleBtnLabel = residualModeActive ? 'Ver Riesgo Inherente' : 'Ver Riesgo Residual';
-            const toggleBtnStyle = residualModeActive
-                ? 'background:#dcfce7;border:1px solid #86efac;color:#166534;'
-                : 'background:#f5f5f5;border:1px solid #e5e7eb;color:#555;';
-
             // F19: Criticality table
             const rankings = calcBarrierCriticality(causes, impacts);
             let criticalityRowsHTML = '';
@@ -2103,43 +2085,6 @@
                 });
             }
 
-            // C10: Mini-matrix — posición de cada causa/consecuencia en grilla 4x4
-            // Construir celdas marcadas con puntos de colores por tipo (causa=azul, consecuencia=violeta)
-            function miniMatrixBg(p, s) {
-                const sc = p * s;
-                if (sc >= 12) return '#fca5a5';
-                if (sc >= 8)  return '#fdba74';
-                if (sc >= 4)  return '#fef08a';
-                return '#bbf7d0';
-            }
-            const mmCellSize = 18;
-            const mmLabels = { prob: ['I','P','Pr','A'], sev: ['Me','Mo','Al','C'] };
-            let mmRows = '';
-            for (let pi = 3; pi >= 0; pi--) {
-                let row = `<td style="font-size:8px;color:#aaa;padding-right:2px;text-align:right;">${mmLabels.prob[pi]}</td>`;
-                for (let si = 0; si < 4; si++) {
-                    const bg = miniMatrixBg(pi + 1, si + 1);
-                    const causeDots = causes.filter(c => (probScores[c.prob] || 2) === pi + 1).map(() => `<circle r="3.5" fill="#3b82f6" opacity="0.85"/>`).join('');
-                    const impactDots = impacts.filter(i => (sevScores[i.severity] || 2) === si + 1 && (probScores['altamente'] || 4) === pi + 1).map(() => '').join('');
-                    // For causes: plot where prob matches row; for impacts: use their sev vs a representative row
-                    const hasCause = causes.some(c => (probScores[c.prob] || 2) === pi + 1);
-                    const hasImpact = impacts.some(i => (sevScores[i.severity] || 2) === si + 1);
-                    // We want: blue dot if any cause has this prob; purple dot if any impact has this sev
-                    // They're orthogonal dimensions so just overlay
-                    let dots = '';
-                    if (hasCause && hasImpact) dots = `<circle cx="5" cy="9" r="3.5" fill="#3b82f6" opacity="0.9"/><circle cx="13" cy="9" r="3.5" fill="#7c3aed" opacity="0.9"/>`;
-                    else if (hasCause) dots = `<circle cx="9" cy="9" r="3.5" fill="#3b82f6" opacity="0.9"/>`;
-                    else if (hasImpact) dots = `<circle cx="9" cy="9" r="3.5" fill="#7c3aed" opacity="0.9"/>`;
-                    row += `<td style="padding:1px;"><svg width="${mmCellSize}" height="${mmCellSize}" style="display:block;"><rect width="${mmCellSize}" height="${mmCellSize}" rx="2" fill="${bg}"/>${dots}</svg></td>`;
-                }
-                mmRows += `<tr>${row}</tr>`;
-            }
-            let mmHeaderRow = `<td></td>${mmLabels.sev.map(l => `<td style="font-size:8px;color:#aaa;text-align:center;">${l}</td>`).join('')}`;
-            const miniMatrixHTML = `<table style="border-collapse:collapse;"><thead><tr>${mmHeaderRow}</tr></thead><tbody>${mmRows}</tbody></table>
-                <div style="display:flex;gap:8px;margin-top:3px;">
-                    <span style="font-size:9px;color:#666;display:flex;align-items:center;gap:3px;"><svg width="8" height="8"><circle cx="4" cy="4" r="3.5" fill="#3b82f6"/></svg>Causa</span>
-                    <span style="font-size:9px;color:#666;display:flex;align-items:center;gap:3px;"><svg width="8" height="8"><circle cx="4" cy="4" r="3.5" fill="#7c3aed"/></svg>Consecuencia</span>
-                </div>`;
 
             // F18: What-If — BPEI si todas las barreras bajas fueran subidas a media
             const whatIfBpei = (() => {
@@ -2189,24 +2134,9 @@
                     ${highB > 0 ? `<span class="risk-metric-chip" style="border-color:#16a34a;color:#16a34a;">${highB} alta</span>` : ''}
                     ${medB > 0 ? `<span class="risk-metric-chip" style="border-color:#f59e0b;color:#b45309;">${medB} media</span>` : ''}
                     ${lowB > 0 ? `<span class="risk-metric-chip" style="border-color:#dc2626;color:#dc2626;">${lowB} baja</span>` : ''}
-                    <button onclick="residualModeActive=!residualModeActive;renderBowTieDiagram(false);" style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;${toggleBtnStyle}cursor:pointer;margin-left:4px;">${toggleBtnLabel}</button>
                 </div>
                 <div class="risk-summary-body">
                     ${alertsHTML}
-                </div>
-                <div style="border-top:1px solid #f0f0f0;">
-                    <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'flex':'none';" style="display:flex;align-items:center;gap:6px;padding:8px 14px;cursor:pointer;user-select:none;background:#fafafa;border-bottom:1px solid #f0f0f0;">
-                        <span style="font-size:12px;font-weight:700;color:#444;">Posición en Matriz de Riesgo</span>
-                        <span style="font-size:10px;color:#999;margin-left:4px;">— causas y consecuencias</span>
-                        <span style="margin-left:auto;font-size:11px;color:#aaa;">▼</span>
-                    </div>
-                    <div style="display:none;padding:12px 14px;gap:16px;flex-wrap:wrap;align-items:flex-start;">
-                        <div>${miniMatrixHTML}</div>
-                        <div style="flex:1;min-width:160px;">
-                            <div style="font-size:10px;color:#888;margin-bottom:6px;">Probabilidad (filas): I=Improbable, P=Posible, Pr=Probable, A=Altamente</div>
-                            <div style="font-size:10px;color:#888;">Severidad (cols): Me=Menor, Mo=Moderado, Al=Alto, C=Catastrófico</div>
-                        </div>
-                    </div>
                 </div>
                 <div style="border-top:1px solid #f0f0f0;">
                     <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';" style="display:flex;align-items:center;gap:6px;padding:8px 14px;cursor:pointer;user-select:none;background:#fafafa;border-bottom:1px solid #f0f0f0;">
