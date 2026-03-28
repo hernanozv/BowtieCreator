@@ -1097,7 +1097,7 @@
             else if (val === 4) { key = 'catastrofico'; label = 'Catastrófico'; }
             if (hidden) hidden.value = key;
             if (badge) {
-                const base = 'inline-block text-xs font-medium px-2 py-0.5 rounded-md impact-severity-badge self-center translate-y-[1px] w-[9rem] text-center whitespace-nowrap ';
+                const base = 'inline-block text-xs font-medium px-2 py-0.5 rounded-md impact-severity-badge self-start mt-[3px] w-[9rem] text-center whitespace-nowrap ';
                 const color = key === 'menor' ? 'bg-green-100 text-green-700' :
                               key === 'moderado' ? 'bg-amber-100 text-amber-700' :
                               key === 'alto' ? 'bg-orange-100 text-orange-700' :
