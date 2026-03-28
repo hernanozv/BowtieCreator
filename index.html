@@ -519,6 +519,7 @@
                                 + Añadir Consecuencia
                             </button>
                         </div>
+                    </div>
                 </section>
                 <section id="bowtieDiagramVisualization" class="mt-12 p-4 md:p-6 section-card min-h-[400px]">
                     <div class="flex items-center justify-between mb-6 border-b pb-2">
@@ -1286,14 +1287,14 @@
                     <div class="mt-1 flex items-center gap-3">
                         <div class="w-96 md:w-[28rem]">
                             <input type="range" min="1" max="4" step="1" value="2" class="cause-probability-slider" draggable="false" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" onpointercancel="resumeGroupDnD(this)" onmousedown="pauseGroupDnD(this); event.stopPropagation()" onmouseup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)" ondragstart="event.preventDefault();event.stopPropagation();" oninput="updateImpactSeveritySlider(this)">
-                            <div class="relative mt-1 h-4 text-[11px] text-gray-600 select-none prob-slider-pad">
+                            <div class="relative mt-1 h-9 text-[11px] text-gray-600 select-none prob-slider-pad">
                                 <span class="absolute left-[0%] cause-prob-label" onclick="setImpactSeverityFromLabel(this, 1)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">Menor</span>
                                 <span class="absolute left-[33.333%] -translate-x-1/2 transform cause-prob-label w-24 text-center" onclick="setImpactSeverityFromLabel(this, 2)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">Moderado</span>
                                 <span class="absolute left-[66.666%] -translate-x-1/2 transform cause-prob-label w-24 text-center" onclick="setImpactSeverityFromLabel(this, 3)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">Alto</span>
                                 <span class="absolute left-[100%] translate-x-[-100%] transform cause-prob-label" onclick="setImpactSeverityFromLabel(this, 4)" onpointerdown="pauseGroupDnD(this); event.stopPropagation()" onpointerup="resumeGroupDnD(this)" ontouchstart="pauseGroupDnD(this); event.stopPropagation()" ontouchend="resumeGroupDnD(this)">Catastrófico</span>
                             </div>
                         </div>
-                        <span class="inline-block text-xs font-medium px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 impact-severity-badge self-center translate-y-[1px] w-[9rem] text-center whitespace-nowrap">Moderado</span>
+                        <span class="inline-block text-xs font-medium px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 impact-severity-badge self-start mt-[3px] w-[9rem] text-center whitespace-nowrap">Moderado</span>
                     </div>
                     <input type="hidden" class="impact-severity" value="moderado">
                 </div>
